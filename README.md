@@ -2,7 +2,7 @@
 
 A celebration-planning workspace for weddings, birthdays, and community events.
 
-**Current status: Phase 1 foundation complete.** You can enter, validate, review, and edit an event brief. Briefs exist only in the current page's memory: refreshing or leaving discards them. AI generation, saving/reopening plans, budget tracking, timelines, and vendor management are not implemented yet.
+**Phase 2 implementation is complete; live AI verification is pending.** Server-side Gemini generation, checked planning artifacts, an interactive dashboard and browser-local save/reopen workflows are implemented. `GEMINI_API_KEY` was absent during development, so provider behavior was tested with mocks, not a real account. There is no production mock fallback.
 
 ## Challenge and approach
 
@@ -10,23 +10,28 @@ Target: PromptWars Virtual 2026, Main Challenge 05 — Celebration & Event Plann
 
 User-supplied problem statement: “Create a GenAI-powered planning assistant that helps users organize weddings, birthdays, and community events with budgets, timelines, vendor checklists, and personalized ideas.”
 
-The planned solution combines contextual Gemini suggestions with deterministic financial and scheduling logic. Phase 1 establishes trustworthy inputs and accessible navigation before introducing AI. See [the development plan](docs/DEVELOPMENT_PLAN.md) for the full proposal and [the Phase 1 report](docs/PHASE_1_REPORT.md) for verified results.
+Gemini proposes personalized priorities, tasks, vendor categories, ideas and trade-offs. Application code owns exact money arithmetic, date boundaries, dependency scheduling and stored-data validation. Schema validity does not prove recommendations true: assumptions, estimates and feasibility warnings remain visible.
 
-## Implemented features
+See [the development plan](docs/DEVELOPMENT_PLAN.md), [Phase 1 report](docs/PHASE_1_REPORT.md), and [Phase 2 report](docs/PHASE_2_REPORT.md). Earlier reports are historical records, not descriptions of the current feature set.
 
-- Next.js App Router with TypeScript strict mode and Tailwind CSS.
-- Responsive overview, event creation, planning guide, and not-found recovery pages.
-- Wedding, birthday, and community-event radio choices with native keyboard behavior.
-- Event name, date, location, guest count, budget in INR, theme, personal preferences, and special requirements.
-- Zod input validation with error summary, associated field errors, and first-invalid-field focus.
-- Review/edit flow that preserves entered values while this page stays open.
-- Reusable domain types, canonical event-details schema, and a versioned future-storage contract.
-- Locally bundled fonts, Lucide icons, semantic navigation, skip link, visible focus, and reduced-motion support.
-- Unit/component tests plus desktop/mobile production-browser checks and automated axe scans.
+## Features
 
-## Requirements and local setup
+- Next.js App Router, TypeScript strict mode, Tailwind, locally bundled fonts and Lucide icons.
+- Responsive overview, accessible event form, review/edit step, planning guide and recovery states.
+- Weddings, birthdays and community events; name, date, location, guests, INR budget, theme, preferences and special requirements.
+- Server-side official `@google/genai` integration with structured JSON, Zod validation and bounded error recovery.
+- Personalized overview, recommendations, ideas, savings, assumptions and feasibility warnings.
+- Exact integer-paise allocations with contingency, estimated budget per guest, category rationale and exact totals.
+- Dependency-aware timeline with completion checkboxes, progress and overdue labels.
+- Essential/optional vendor categories with editable selection statuses. No verified businesses, prices, ratings or availability are claimed.
+- Versioned localStorage: explicit save, multiple events, stable plan URLs, refresh/reopen, validation, corruption isolation and stale-write checks.
+- Automated unit, component, API integration and desktop/mobile production-browser tests.
 
-Verified with Node.js **24.19.0** and npm **11.17.0**. Use Node 24.x. Git is needed to clone the public repository. No API key, account login, database, or environment file is needed to run Phase 1.
+Expense recording, editable allocations, task authoring, requirement regeneration/merging, JSON backup, collaboration and cloud persistence remain later work.
+
+## Local setup
+
+Verified environment: Node **24.19.0**, npm **11.17.0**; use Node 24.x.
 
 ```powershell
 git clone https://github.com/Neeraj20217/planora-ai.git
@@ -35,19 +40,79 @@ npm ci
 npm run dev
 ```
 
-For the existing checkout:
+For the existing checkout, use `Set-Location D:\Coding\Codex\planora-ai` first. Open [http://localhost:3000](http://localhost:3000). You can review event details and reopen saved plans without credentials. Generation reports a configuration error until configured; entered details remain intact.
 
-```powershell
-Set-Location D:\Coding\Codex\planora-ai
-npm ci
-npm run dev
+Both dev and build scripts use Webpack. Windows Smart App Control blocks native SWC on the verified machine, so Next.js uses its supported WASM fallback. Its first use may download a package into Next's user cache. No system security policy is disabled or bypassed.
+
+### Configure Gemini securely
+
+1. Copy `.env.example` to `.env.local` without replacing an existing configuration.
+2. Enter your key locally in `GEMINI_API_KEY`. Never paste it into chat, frontend code, screenshots, a public repository or `NEXT_PUBLIC_` variables.
+3. Set `GEMINI_MODEL=gemini-3.8-flash` and `AI_ENABLE_LOCAL_GENERATION=true` for local testing.
+4. Restart the local server. Run `npm run ai:models` to list Flash model IDs accessible to your account. This command prints model names only, never the key or raw provider errors.
+5. Create an event, review its sharing notice, and choose **Generate plan**. This explicitly sends the event brief to Google. Avoid sensitive guest information.
+
+Default model: `gemini-3.8-flash`, publicly documented as stable with structured-output support on 26 October 2026. Account-specific availability, billing and quota have **not** been verified. There is no silent model fallback. `GEMINI_MODEL` can select another compatible model after checking its capabilities. Gemini 3 models use low thinking; other overrides use their provider defaults. SDK version: `@google/genai` 2.31.0.
+
+Check current model availability and terms in [Google's model documentation](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [structured-output documentation](https://ai.google.dev/gemini-api/docs/structured-output), [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) and [pricing](https://ai.google.dev/gemini-api/docs/pricing). No fixed free quota or cost guarantee is assumed.
+
+**Local-only generation gate:** missing credentials return 503. Even with a key, generation requires explicit local enablement and a loopback host; Vercel-hosted requests are blocked. This is not a publicly deployable paid endpoint. Shared rate limiting, access/bot controls and operational spend controls must be designed and verified before enabling hosted generation in a later authorized phase. No deployment is performed here.
+
+## How planning works
+
+```text
+Event form -> Zod validation -> review + sharing notice
+  -> POST /api/plans/generate
+     -> origin/content type/body limits + independent request validation
+     -> local-only activation + concurrency/request limits
+     -> server-only Google SDK + prompt/context + JSON schema
+     -> Zod + semantic proposal checks
+     -> deterministic budget/timeline/vendor composition
+     -> canonical plan validation
+  -> dashboard -> explicit save -> localStorage -> saved-event URL/reopen
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Routes: `/` (overview), `/events/new` (brief form), `/guide` (planning guide).
+### Deterministic rules
 
-Dependencies are pinned with `package-lock.json`. Important versions: Next.js 16.4.3, React 19.3.1, Tailwind 4.3.3, Zod 4.6.7, TypeScript 6.0.3, Vitest 5.0.5. ESLint uses the official Next plugin directly with TypeScript, React Hooks, and accessibility plugins to avoid outdated transitive peer ranges in the aggregate config.
+- Money enters as decimal rupee strings and is stored as integer paise. No decimal multiplication is used for input conversion. Model output contains relative integer weights, not authoritative totals.
+- Reserve `floor(totalPaise / 10)` for contingency. Allocate the remainder using largest remainders, with stable category-name tie breaking. Merge model priorities with event-type defaults; zero/invalid outputs cannot create negative or missing funds. All category allocations, including contingency, sum exactly to the total. These are allowances, not quotes.
+- Per-guest display uses the floor paise quotient and is labeled approximate. Zero budget is valid and yields zero allocations with an in-kind/DIY feasibility warning. Low per-guest and large-crowd thresholds are disclosed heuristics, not local market facts.
+- Dates are date-only values in Asia/Kolkata. The server derives the current date independently. UTC calendar ordinals avoid host timezone/DST errors. Core task templates and model tasks are topologically ordered, clamped to the planning interval and adjusted so prerequisites are no later than dependents. Compressed/same-day schedules explicitly warn that dates alone do not establish feasibility.
+- Essential venue/coordination arrangements are retained. A paid supplier is not required for every essential service. The provider adds context-specific categories/rationale.
+- Prompts receive normalized event data and derived days, urgency and budget pressure. Free text is untrusted data. There is no tool execution, booking, arbitrary server fetch, vendor lookup or external action.
 
-Both development and production build scripts explicitly use Webpack. On the verified Windows machine, Application Control blocks native SWC; Next.js successfully uses its supported WebAssembly compiler fallback with Webpack. The first fallback use can require a network download into Next.js's user cache. No policy changes or native-binary exclusions are needed.
+### Validation and failures
+
+Requests accept only a strict `{brief}` object. Fields retain Phase 1 bounds: 1–10,000 guests; INR 0–10 crore; real nonpast creation date; bounded text. Bodies are limited to **32 KiB measured from the stream**, with a five-second read deadline.
+
+AI sections have bounded lengths/arrays, enum categories and integer weights. Duplicate categories/task keys, missing dependencies, cycles, invalid allocations or dates are rejected. Unsupported fields such as vendor prices are rejected. Generated factual claims can still be wrong; the UI does not present them as verified.
+
+Normal generation uses one call. There are at most **two provider attempts total**, shared by one schema-repair or one retry for selected transient 5xx errors. Provider 429/authentication errors are not automatically retried. SDK internal retries are disabled; each SDK request has a 20-second timeout, the combined generation has a 35-second abort deadline, and the browser has a 50-second bound. Failures return safe codes/messages and never save partial plans. The previous brief remains editable. No raw provider response/error or key is logged by application code.
+
+## Persistence and privacy
+
+Plans are saved only when **Save plan** or **Save changes** is chosen. First save navigates to `/events/<uuid>`, so refreshing reopens that saved record. Task and vendor edits require another explicit save.
+
+Each plan uses `planora:plan:v1:<uuid>` and contains schema version, revision, event brief, model/prompt provenance, generation date and validated artifacts. Readable records remain available if another record is corrupt; unreadable records are left untouched. Storage denial/full quota surfaces a recoverable error. A 50-record and 128 Ki-character per-record limit bounds storage work. Revision checks reject stale writes; localStorage has no atomic multi-tab transaction, so truly simultaneous writes can still race. There is no cross-device sync or encrypted storage.
+
+Saved plans stay on the same browser/profile/site origin. Clearing site data or using private browsing may remove them; localhost and a future deployment have separate data. Unsaved briefs/plans are lost when leaving or refreshing; visible notices explain this. Internal links ask before discarding unsaved plan edits; browser Back/programmatic navigation may still discard them, so save first. No automatic generation occurs on reload. All scripts on the origin can access localStorage, so avoid sensitive personal information. AI generation sends the brief to Google subject to the selected service terms; local save itself does not send it to a backend.
+
+## Structure
+
+```text
+src/app/                      overview, form, saved event, guide, API route
+src/components/events/        accessible form and saved-event list
+src/components/planner/       generation states, dashboard, saved-plan loader
+src/lib/ai/                   public model ID, prompt, SDK adapter, orchestration
+src/lib/domain/               context, money, date, budget, timeline, composition
+src/lib/schemas/              event, proposal and canonical plan schemas
+src/lib/server/               request handling, safe errors, local rate limits
+src/lib/storage/              versioned records and external-store hook
+src/types/                    schema-inferred contracts
+tests/{unit,components,integration,e2e,fixtures}/
+scripts/check-models.mjs       optional credential-safe model-access check
+docs/                         approved plan and delivery reports
+```
 
 ## Verification
 
@@ -60,66 +125,27 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`typecheck` generates Next route types before running `tsc --noEmit`, so it also works before the first build. `test:e2e` requires a completed production build and starts/stops a local production server on port 3100. Leave that port free. Playwright tests use desktop Chromium and mobile Chromium emulation; they do not establish Safari/iOS compatibility. Browser binaries, reports, and traces stay outside tracked source. `npm run test:watch` is available for local test iteration.
+`typecheck` generates Next route types before `tsc --noEmit`. `test:e2e` needs a completed production build and starts a local server on port 3100. It explicitly clears the server key and disables generation so the suite cannot incur model usage. Successful browser generation uses labeled network fixtures; real route validation/missing-key handling and the SDK contract have separate tests. There is no user-facing test mode or mock endpoint in the app.
 
-Production build locally:
+Tests cover preserved Phase 1 behavior, exact allocations and rounding, date/dependency rules, three event categories, response schema/semantic failures, bounded retries/timeouts, missing credentials, independent input validation, origin/size limits, local request caps, corruption/quota/stale writes, save/refresh/reopen/multiple events, keyboard focus, responsive layout and axe checks. Mobile testing uses Chromium emulation, not Safari/iOS. Automated scans do not establish full WCAG conformance. Actual results and limitations are recorded in the Phase 2 report.
+
+To run the production build locally:
 
 ```powershell
 npm run build
 npm start
 ```
 
-This serves the application locally; it is not a cloud deployment.
+## Security and release constraints
 
-## Architecture and logic
+The SDK/key live only in server modules; the adapter imports `server-only`. No `NEXT_PUBLIC_` secret exists. JSON text is rendered by React without HTML execution. Responses are `no-store`, and errors disclose no internal provider details. No CORS access is granted.
 
-```text
-App Router server layout/pages
-  └─ EventForm client component
-       ├─ Field component (labels, hints, linked errors)
-       ├─ Zod form schema → normalized EventDetails
-       ├─ Date-only validation in Asia/Kolkata
-       └─ Exact decimal-string → integer-paise conversion
-            └─ In-memory review → edit
-```
+Local protection permits **one active generation, three requests/minute and twenty/hour per process** (up to two provider attempts per request). These are not durable/distributed limits and reset on restart. Origin checks protect browser requests, not authorization against curl; host checks are local-development gates, not a production authentication system. Hosted generation remains blocked pending stronger controls. Budget alerts alone would not be a hard spending cap.
 
-`src/lib/schemas/event.ts` is the shared contract. Types are inferred from schemas rather than duplicated. Guests must be an integer from 1 through 10,000. Dates must be real calendar dates on or after today in India; current date is rechecked on submit. Budgets must be from INR 0 through INR 10 crore, without commas, using at most two decimal places. Money is converted using integer arithmetic, not decimal multiplication. Names/locations and optional text have explicit length limits.
+Work only on `main`. Source, lockfile and tests stay below the supplied 10 MB repository limit. Dependencies, build artifacts, environments, screenshots and traces are ignored. Never commit credentials. No Vercel deployment or PromptWars submission is authorized by this release.
 
-`eventDetailsSchema` validates the canonical domain shape; `eventBriefSchema` wraps it in version/UUID/revision metadata for later persistence. Stored date contracts deliberately permit historic dates, whereas a new form rejects past dates. No storage adapter or AI endpoint is implemented in Phase 1.
+## Remaining work
 
-```text
-src/app/                 overview, layout, styles, event route, guide, 404
-src/components/          navigation, event form, reusable field
-src/lib/domain/          date and money primitives
-src/lib/schemas/         form/domain/versioned brief contracts
-src/types/               schema-inferred public types
-tests/unit/              input boundaries, money, dates, contract tests
-tests/components/        form validation, review/edit, focus and recovery
-tests/e2e/               production navigation, form flows, axe, mobile layout
-docs/                    development plan and phase report
-```
+Configure a local key and verify model access, a real generation for each event type, latency, schema adherence and quota/cost. Later approved work may add budget/expense editing, task authoring, requirement revisions, backup/export, broader browser/screen-reader verification and durable hosted abuse controls.
 
-## Contextual AI decision-making — planned
-
-Later phases will derive preparation time and budget pressure deterministically, then request structured Gemini suggestions with rationale and explicit assumptions. Schema/semantic validation will precede acceptance. Exact allocation totals, timeline boundaries, and progress will remain application logic. No live contextual AI claims are made for this foundation release. No Google SDK or AI integration has been added.
-
-## Security, privacy, and accessibility
-
-The form does not call external services or write browser storage. React renders user input as text. No API credentials are needed or tracked. Ignore rules exclude environments, dependencies, build output, local tool artifacts, and test reports. Future server handlers must independently enforce the shared schema; browser validation alone is not a security boundary.
-
-Automated accessibility checks cover the initial form and validation-error state. Keyboard checks cover navigation, skip link, radio selection, first-error focus, and review focus. Automated checks are partial evidence, not a claim of complete WCAG conformance; screen-reader and broader browser reviews remain future quality work.
-
-## Deployment and submission — deferred
-
-Vercel is the planned host. Before a later authorized release: verify owner/project/runtime, run quality checks, configure server-only credentials when AI exists, stage/test production, and promote the tested build. No deployment or competition submission was performed for Phase 1.
-
-Work only on `main`. Keep source, history, and submission archive below the user-supplied 10 MB limit; generated dependencies/builds/videos do not belong in Git. The supplied three-attempt limit applies to official submissions, not commits or tests. Prepare a demonstration under four minutes only when the working MVP is ready.
-
-## Assumptions and limitations
-
-- Single organizer, English UI, INR, date-only events in Asia/Kolkata.
-- No saving, persistence, account system, real AI, vendor lookup, prices, or booking functionality yet.
-- No sensitive guest details should be entered. User-entered content is lost on refresh/navigation by design in this foundation phase.
-- The full development plan describes future scope; its original environment findings are historical. Authentication and publication status are updated in the Phase 1 report.
-- Hackathon-specific rules and the supplied November 1 deadline remain subject to official confirmation. The public [PromptWars FAQ](https://promptwars.in/promptwarsVirtual.html) requires Google Antigravity despite broader wording elsewhere. Codex eligibility has not been established.
-- No deployment, submission, or Phase 2 work is authorized by this release.
+Hackathon-specific deadline/rules remain subject to official confirmation. The public [PromptWars FAQ](https://promptwars.in/promptwarsVirtual.html) requires Google Antigravity despite broader wording elsewhere; Codex eligibility remains unresolved. The original November 1 deadline is a user-supplied working requirement. No competition submission has been performed.

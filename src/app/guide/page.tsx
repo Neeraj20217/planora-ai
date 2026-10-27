@@ -44,10 +44,12 @@ export default function GuidePage() {
         <section>
           <h2>Review before moving on</h2>
           <p>
-            The current version lets you check and edit your brief. It isn’t
-            saved when you leave or refresh this page. AI recommendations, saved
-            events, budget tracking, timelines, and vendor checklists are
-            planned for later updates.
+            Review and edit your brief, then choose Generate plan to send the
+            details to Google Gemini. The plan includes estimated allocations,
+            tasks, vendor categories and ideas. Check its assumptions and save
+            it in this browser before leaving. You can reopen saved plans from
+            My events, complete tasks and update vendor statuses. Expense
+            tracking and budget editing are planned for a later update.
           </p>
         </section>
       </div>

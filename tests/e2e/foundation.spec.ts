@@ -78,6 +78,7 @@ test("layout fits the viewport and passes automated accessibility checks", async
 }) => {
   await page.goto("/events/new");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review event details" })).toBeEnabled();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

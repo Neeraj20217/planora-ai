@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, CalendarHeart, Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { SavedEvents } from "@/components/events/saved-events";
 
 export default function Home() {
   return (
@@ -37,18 +38,7 @@ export default function Home() {
           <h2 id="events-title">Your events</h2>
           <span className="quiet">A fresh start</span>
         </div>
-        <div className="empty-events">
-          <CalendarHeart aria-hidden="true" size={38} strokeWidth={1.25} />
-          <h3>Your next celebration starts here.</h3>
-          <p>
-            No saved events yet. You can create and review an event brief now.
-            <br className="desktop-break" /> Saving events will be available in
-            a future update.
-          </p>
-          <Link href="/events/new" className="button button-secondary">
-            <Plus aria-hidden="true" size={17} /> Create an event
-          </Link>
-        </div>
+        <SavedEvents />
       </section>
     </div>
   );

@@ -9,3 +9,5 @@ The source concepts considered were an invitation suite, a volunteer running she
 Desktop: full-width navigation, main form plus supporting margin. Mobile: navigation wraps into its own row, form controls become one column, guidance follows the task. Essential copy and control labels remain visible. Normal text uses high-contrast ink; focus uses a 3px ochre outline. Reduced-motion preferences disable transitions. No decorative animations, mock data, fabricated metrics, or pretend AI controls.
 
 Future pages should preserve this typographic and interaction system unless the user requests a new direction.
+
+Phase 2 extends this system with section anchor navigation, ruled budget rows with tabular figures, labeled native checkboxes/progress, native vendor status selects, explicit generation/sharing states and local save/error notices. It preserves the existing type, palette and responsive behavior; it adds no new visual identity. Fixture screenshots must be labeled as test data, never presented as live model output.

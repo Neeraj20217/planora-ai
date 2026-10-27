@@ -34,7 +34,7 @@ export const eventDetailsSchema = z
   })
   .strict();
 
-/** Versioned contract for future persistence; Phase 1 does not write browser storage. */
+/** Versioned brief contract; generated plans use the envelope in plan.ts. */
 export const eventBriefSchema = z
   .object({
     schemaVersion: z.literal(1),

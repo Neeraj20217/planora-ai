@@ -1,0 +1,407 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Save, Check } from "lucide-react";
+import {
+  CATEGORY_LABELS,
+  type EventPlan,
+  type PlanVendor,
+} from "@/lib/schemas/plan";
+import { EVENT_TYPE_LABELS } from "@/lib/schemas/event";
+import { formatINR } from "@/lib/domain/money";
+import { formatEventDate, todayInIndia } from "@/lib/domain/date";
+import { planningContext } from "@/lib/domain/context";
+import { savePlan, STORAGE_EVENT } from "@/lib/storage/plans";
+
+export function PlanDashboard({
+  initialPlan,
+  savedRevision,
+}: {
+  initialPlan: EventPlan;
+  savedRevision?: number;
+}) {
+  const router = useRouter();
+  const [plan, setPlan] = useState(initialPlan);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    title.current?.focus();
+  }, []);
+  useEffect(() => {
+    if (!dirty && plan.revision > 0) return;
+    const listener = (event: BeforeUnloadEvent) => event.preventDefault();
+    const navigation = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const anchor =
+        event.target instanceof Element
+          ? event.target.closest<HTMLAnchorElement>("a[href]")
+          : null;
+      if (
+        !anchor ||
+        anchor.target === "_blank" ||
+        anchor.hasAttribute("download")
+      )
+        return;
+      const destination = new URL(anchor.href, window.location.href);
+      if (
+        destination.origin !== window.location.origin ||
+        (destination.pathname === window.location.pathname &&
+          destination.search === window.location.search)
+      )
+        return;
+      if (
+        !window.confirm(
+          "This plan has unsaved changes. Leave without saving them?",
+        )
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", listener);
+    document.addEventListener("click", navigation, true);
+    return () => {
+      window.removeEventListener("beforeunload", listener);
+      document.removeEventListener("click", navigation, true);
+    };
+  }, [dirty, plan.revision]);
+  const context = planningContext(plan.details, plan.asOfDate);
+  const completed = plan.tasks.filter((task) => task.completed).length;
+  const percent = Math.round((completed / plan.tasks.length) * 100);
+  const conflict =
+    savedRevision !== undefined && savedRevision !== plan.revision;
+  const tasks = [...plan.tasks].sort((a, b) =>
+    a.dueDate.localeCompare(b.dueDate),
+  );
+
+  function save() {
+    try {
+      const next = savePlan(plan, window.localStorage);
+      setPlan(next);
+      setDirty(false);
+      setError("");
+      setMessage(
+        "Plan saved in this browser. You can reopen it from My events.",
+      );
+      window.dispatchEvent(new Event(STORAGE_EVENT));
+      if (plan.revision === 0) router.replace(`/events/${next.id}`);
+    } catch (issue) {
+      setError(
+        issue instanceof Error
+          ? issue.message
+          : "Saving failed. Your plan remains on this page.",
+      );
+      setMessage("");
+    }
+  }
+  function updateVendor(
+    category: PlanVendor["category"],
+    status: PlanVendor["status"],
+  ) {
+    setPlan((current) => ({
+      ...current,
+      vendors: current.vendors.map((vendor) =>
+        vendor.category === category ? { ...vendor, status } : vendor,
+      ),
+    }));
+    setDirty(true);
+    setMessage("");
+  }
+
+  return (
+    <div className="page-wrap dashboard">
+      <Link href="/" className="back-link">
+        <ArrowLeft aria-hidden="true" size={16} /> My events
+      </Link>
+      <div className="dashboard-heading">
+        <div>
+          <h1 ref={title} tabIndex={-1}>
+            {plan.details.name}
+          </h1>
+          <p className="quiet">
+            {EVENT_TYPE_LABELS[plan.details.eventType]} ·{" "}
+            {formatEventDate(plan.details.date)} · {plan.details.location}
+          </p>
+        </div>
+        <button type="button" className="button button-primary" onClick={save}>
+          <Save aria-hidden="true" size={18} />
+          {plan.revision > 0 ? "Save changes" : "Save plan"}
+        </button>
+      </div>
+      <p className="scope-note">
+        {plan.provenance === "test-fixture"
+          ? "Test fixture — not live AI."
+          : `Generated with Gemini (${plan.model}).`}{" "}
+        Planning snapshot: {formatEventDate(plan.asOfDate)}.{" "}
+        {plan.revision === 0
+          ? "Not saved yet. Save before leaving or refreshing."
+          : dirty
+            ? "You have unsaved changes."
+            : "Saved in this browser only."}{" "}
+        {context.daysRemaining} day(s) to prepare at generation.
+      </p>
+      {message ? (
+        <p className="save-message" role="status">
+          <Check aria-hidden="true" size={16} />
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="error-summary" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {conflict ? (
+        <p className="error-summary" role="alert">
+          Another tab changed this saved plan. Reload to view that version
+          before saving. Your current edits have not been replaced.
+        </p>
+      ) : null}
+      <nav aria-label="Plan sections" className="plan-nav">
+        <a href="#overview">Overview</a>
+        <a href="#budget">Budget</a>
+        <a href="#timeline">Timeline</a>
+        <a href="#vendors">Vendors</a>
+        <a href="#ideas">Ideas</a>
+      </nav>
+      <section id="overview" className="plan-section">
+        <h2>Your celebration, thoughtfully planned</h2>
+        <p>{plan.overview}</p>
+        <dl className="event-facts">
+          <div>
+            <dt>Guests</dt>
+            <dd>{plan.details.guests.toLocaleString("en-IN")}</dd>
+          </div>
+          <div>
+            <dt>Total budget</dt>
+            <dd>{formatINR(plan.details.budgetPaise)}</dd>
+          </div>
+          <div>
+            <dt>Theme</dt>
+            <dd>{plan.details.theme || "Open to ideas"}</dd>
+          </div>
+        </dl>
+        <details>
+          <summary>Your preferences & special requirements</summary>
+          <p>{plan.details.preferences || "No preferences added."}</p>
+          <p>
+            {plan.details.specialRequirements ||
+              "No special requirements added."}
+          </p>
+        </details>
+      </section>
+      <section
+        className="plan-section warning-section"
+        aria-labelledby="warnings-title"
+      >
+        <h2 id="warnings-title">Feasibility & things to confirm</h2>
+        <p>
+          AI suggestions may be incomplete or inaccurate. Verify feasibility,
+          suppliers and local requirements before committing.
+        </p>
+        {plan.warnings.length ? (
+          <ul>
+            {plan.warnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>
+            No additional conflicts were flagged. This does not guarantee
+            feasibility.
+          </p>
+        )}
+        <details>
+          <summary>Planning assumptions</summary>
+          <ul>
+            {plan.assumptions.map((item, index) => (
+              <li key={index}>{item}</li>
+            ))}
+          </ul>
+        </details>
+      </section>
+      <section id="budget" className="plan-section">
+        <h2>A budget with breathing room</h2>
+        <p>
+          Estimated allocations, not vendor quotes. Includes a 10% contingency
+          reserve, rounded down to a paise. About{" "}
+          {formatINR(context.perGuestPaise)} per guest before contingency.
+        </p>
+        <div className="budget-lines" role="list">
+          {plan.categories.map((category) => (
+            <div
+              className="budget-line"
+              role="listitem"
+              key={category.category}
+            >
+              <div>
+                <h3>{CATEGORY_LABELS[category.category]}</h3>
+                <p>{category.rationale}</p>
+              </div>
+              <strong>{formatINR(category.allocationPaise)}</strong>
+            </div>
+          ))}
+        </div>
+        <p className="budget-total">
+          Total allocated{" "}
+          <strong>
+            {formatINR(
+              plan.categories.reduce(
+                (sum, category) => sum + category.allocationPaise,
+                0,
+              ),
+            )}
+          </strong>
+        </p>
+      </section>
+      <section id="timeline" className="plan-section">
+        <h2>Your preparation timeline</h2>
+        <p>
+          {completed} of {plan.tasks.length} tasks complete · {percent}%
+        </p>
+        <progress
+          value={completed}
+          max={plan.tasks.length}
+          aria-label="Planning progress"
+        />
+        <p className="quiet">
+          Dates are in India time. Tasks on the same day still need to follow
+          dependency order.
+        </p>
+        <ol className="task-list">
+          {tasks.map((task) => (
+            <li key={task.id}>
+              <label className="task-control">
+                <input
+                  type="checkbox"
+                  checked={task.completed}
+                  onChange={() => {
+                    setPlan((current) => ({
+                      ...current,
+                      tasks: current.tasks.map((item) =>
+                        item.id === task.id
+                          ? { ...item, completed: !item.completed }
+                          : item,
+                      ),
+                    }));
+                    setDirty(true);
+                    setMessage("");
+                  }}
+                />
+                <span>
+                  <span className={task.completed ? "completed-task" : ""}>
+                    {task.title}
+                  </span>
+                  <span className="task-date">
+                    {formatEventDate(task.dueDate)}
+                    {task.priority === "high" ? " · Priority" : ""}
+                    {!task.completed && task.dueDate < todayInIndia()
+                      ? " · Overdue"
+                      : ""}
+                  </span>
+                  {task.dependsOn.length ? (
+                    <span className="task-deps">
+                      After:{" "}
+                      {task.dependsOn
+                        .map(
+                          (id) =>
+                            plan.tasks.find((item) => item.id === id)!.title,
+                        )
+                        .join("; ")}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <section id="vendors" className="plan-section">
+        <h2>People & services to arrange</h2>
+        <p>
+          Essential refers to the arrangement, not a requirement to hire.
+          Self-provided space, DIY and volunteer help may be suitable. No
+          businesses, prices or availability have been verified.
+        </p>
+        <div className="vendor-list">
+          {plan.vendors.map((vendor) => (
+            <div className="vendor-row" key={vendor.category}>
+              <div>
+                <h3>
+                  {CATEGORY_LABELS[vendor.category]}{" "}
+                  <span className="vendor-kind">
+                    {vendor.essential ? "Essential" : "Optional"}
+                  </span>
+                </h3>
+                <p>{vendor.rationale}</p>
+              </div>
+              <div>
+                <label htmlFor={`vendor-${vendor.category}`}>
+                  Selection status for {CATEGORY_LABELS[vendor.category]}
+                </label>
+                <select
+                  id={`vendor-${vendor.category}`}
+                  value={vendor.status}
+                  onChange={(event) =>
+                    updateVendor(
+                      vendor.category,
+                      event.target.value as PlanVendor["status"],
+                    )
+                  }
+                >
+                  <option value="not-started">Not started</option>
+                  <option value="shortlisted">Shortlisted</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="booked">Booked / arranged</option>
+                  <option value="not-needed">Not needed</option>
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="plan-section">
+        <h2>Focus your energy here</h2>
+        <AdviceList items={plan.recommendations} />
+      </section>
+      <section id="ideas" className="plan-section">
+        <h2>Make the moment yours</h2>
+        <AdviceList items={plan.ideas} />
+      </section>
+      <section className="plan-section">
+        <h2>Thoughtful ways to spend less</h2>
+        <AdviceList items={plan.savings} />
+      </section>
+      <p className="scope-note">
+        Plans are stored on this device and site address only. Browser clearing,
+        private browsing or switching devices can remove access. Save after
+        making changes.
+      </p>
+    </div>
+  );
+}
+
+function AdviceList({ items }: { items: EventPlan["ideas"] }) {
+  return (
+    <ul className="advice-list">
+      {items.map((item, index) => (
+        <li key={index}>
+          <h3>{item.suggestion}</h3>
+          <p>{item.rationale}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}

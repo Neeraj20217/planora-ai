@@ -22,6 +22,9 @@ import {
 import { formatEventDate, todayInIndia } from "@/lib/domain/date";
 import { formatINR } from "@/lib/domain/money";
 import type { EventDetails, EventFormValues } from "@/types";
+import type { EventPlan } from "@/lib/schemas/plan";
+import { GenerationPanel } from "@/components/planner/generation-panel";
+import { PlanDashboard } from "@/components/planner/plan-dashboard";
 
 const subscribeToHydration = () => () => {};
 const clientHydrated = () => true;
@@ -57,6 +60,7 @@ export function EventForm({ initialToday }: { initialToday: string }) {
   });
   const [errors, setErrors] = useState<Errors>({});
   const [reviewed, setReviewed] = useState<EventDetails | null>(null);
+  const [generatedPlan, setGeneratedPlan] = useState<EventPlan | null>(null);
   const [minimumDate, setMinimumDate] = useState(initialToday);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
@@ -99,6 +103,8 @@ export function EventForm({ initialToday }: { initialToday: string }) {
       .filter(Boolean)
       .join(" ") || undefined;
   const errorEntries = Object.entries(errors).filter(([, message]) => message);
+
+  if (generatedPlan) return <PlanDashboard initialPlan={generatedPlan} />;
 
   return (
     <div className="page-wrap">
@@ -157,9 +163,10 @@ export function EventForm({ initialToday }: { initialToday: string }) {
                 </div>
               </dl>
               <p className="scope-note" role="status">
-                Your brief has been checked. It stays on this page only and
-                isn’t saved or sent anywhere. AI planning and saving aren’t
-                available yet.
+                Your brief has been checked. It isn’t saved or sent anywhere
+                until you choose Generate plan. Review the sharing notice below
+                before generating. Save the finished plan to keep it in this
+                browser.
               </p>
               <button
                 type="button"
@@ -168,6 +175,10 @@ export function EventForm({ initialToday }: { initialToday: string }) {
               >
                 <Pencil aria-hidden="true" size={17} /> Edit event details
               </button>
+              <GenerationPanel
+                details={reviewed}
+                onGenerated={setGeneratedPlan}
+              />
             </section>
           ) : (
             <>
