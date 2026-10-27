@@ -2,7 +2,9 @@
 
 A celebration-planning workspace for weddings, birthdays, and community events.
 
-**Phase 2 implementation is complete; live AI verification is pending.** Server-side Gemini generation, checked planning artifacts, an interactive dashboard and browser-local save/reopen workflows are implemented. `GEMINI_API_KEY` was absent during development, so provider behavior was tested with mocks, not a real account. There is no production mock fallback.
+**Phase 2 is complete; one real Gemini 3.5 Flash-Lite birthday generation was verified.** Server-side generation, checked planning artifacts, an interactive dashboard and browser-local save/reopen workflows are implemented. The minimal Phase 3 quality pass adds clearer evidence boundaries and mocked coverage for all three event types. Hosted generation remains disabled pending security implementation and independent verification. There is no production mock fallback.
+
+See the [minimal Phase 3 report](docs/PHASE_3_REPORT.md) and [production-readiness assessment](docs/PRODUCTION_READINESS.md) for current verification, deployment blockers and proposed costs. No live requests were made in this quality pass.
 
 ## Challenge and approach
 
@@ -48,11 +50,11 @@ Both dev and build scripts use Webpack. Windows Smart App Control blocks native 
 
 1. Copy `.env.example` to `.env.local` without replacing an existing configuration.
 2. Enter your key locally in `GEMINI_API_KEY`. Never paste it into chat, frontend code, screenshots, a public repository or `NEXT_PUBLIC_` variables.
-3. Set `GEMINI_MODEL=gemini-3.8-flash` and `AI_ENABLE_LOCAL_GENERATION=true` for local testing.
+3. Set `GEMINI_MODEL=gemini-3.5-flash-lite` and `AI_ENABLE_LOCAL_GENERATION=true` for the previously verified local model. Preserve existing local configuration.
 4. Restart the local server. Run `npm run ai:models` to list Flash model IDs accessible to your account. This command prints model names only, never the key or raw provider errors.
 5. Create an event, review its sharing notice, and choose **Generate plan**. This explicitly sends the event brief to Google. Avoid sensitive guest information.
 
-Default model: `gemini-3.8-flash`, publicly documented as stable with structured-output support on 26 October 2026. Account-specific availability, billing and quota have **not** been verified. There is no silent model fallback. `GEMINI_MODEL` can select another compatible model after checking its capabilities. Gemini 3 models use low thinking; other overrides use their provider defaults. SDK version: `@google/genai` 2.31.0.
+The code fallback remains `gemini-3.8-flash`; the current local override is `gemini-3.5-flash-lite`, which passed a real structured-output birthday test. That single success does not establish ongoing quota or reliability. There is no silent model fallback. `GEMINI_MODEL` can select another compatible model after checking its capabilities. Gemini 3 models use low thinking; other overrides use their provider defaults. SDK version: `@google/genai` 2.31.0.
 
 Check current model availability and terms in [Google's model documentation](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [structured-output documentation](https://ai.google.dev/gemini-api/docs/structured-output), [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) and [pricing](https://ai.google.dev/gemini-api/docs/pricing). No fixed free quota or cost guarantee is assumed.
 
