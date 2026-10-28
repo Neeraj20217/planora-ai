@@ -19,9 +19,9 @@ try {
     process.env.GOOGLE_API_KEY?.trim() ||
     process.env.OVERRIDE_BOTID_SERVER_URL
   )
-    throw new Error();
+    throw new Error("CONFIG_OR_KEY_VIOLATION");
   if (readdirSync(root).some((name) => name.startsWith(".env")))
-    throw new Error();
+    throw new Error("ROOT_ENV_FILE_DETECTED");
   for (const [path, hash] of Object.entries(manifest.files)) {
     if (
       path.includes("..") ||
@@ -30,19 +30,21 @@ try {
         root + (process.platform === "win32" ? "\\" : "/"),
       )
     )
-      throw new Error();
+      throw new Error(`PATH_TRAVERSAL_DETECTED:${path}`);
+    if (!existsSync(path))
+      throw new Error(`MISSING_MANIFEST_FILE:${path}`);
     if (createHash("sha256").update(readFileSync(path)).digest("hex") !== hash)
-      throw new Error();
+      throw new Error(`FILE_HASH_MISMATCH:${path}`);
   }
   for (const file of files(resolve(root, "src"))) {
     const path = relative(root, file).replaceAll("\\", "/");
-    if (!manifest.files[path]) throw new Error();
+    if (!manifest.files[path]) throw new Error(`UNTRACKED_SRC_FILE:${path}`);
     if (
       /@google\/genai|GoogleGenAI|generativelanguage\.googleapis\.com/.test(
         readFileSync(file, "utf8"),
       )
     )
-      throw new Error();
+      throw new Error(`SDK_MARKER_IN_SRC:${path}`);
   }
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
@@ -51,9 +53,10 @@ try {
     lock.packages?.["node_modules/@google/genai"] ||
     existsSync("node_modules/@google/genai")
   )
-    throw new Error();
+    throw new Error("SDK_DEPENDENCY_DETECTED");
   if (process.argv.includes("--built")) {
-    if (!existsSync(".next/server")) throw new Error();
+    if (!existsSync(".next/server"))
+      throw new Error("MISSING_COMPILED_SERVER_DIR");
     for (const file of files(resolve(root, ".next/server"))) {
       if (
         /\.(?:js|json)$/.test(file) &&
@@ -61,13 +64,19 @@ try {
           readFileSync(file, "utf8"),
         )
       )
-        throw new Error();
+        throw new Error(
+          `SDK_MARKER_IN_SERVER_BUILD:${relative(root, file).replaceAll("\\", "/")}`,
+        );
     }
   }
   console.log("TEST ONLY artifact integrity and SDK-exclusion checks passed.");
-} catch {
+} catch (err) {
+  const code =
+    err instanceof Error && err.message
+      ? err.message
+      : "UNKNOWN_SAFETY_VIOLATION";
   console.error(
-    "TEST ONLY artifact safety check failed; build/start refused. No private details logged.",
+    `TEST ONLY artifact safety check failed [${code}]; build/start refused. No private details logged.`,
   );
   process.exitCode = 1;
 }

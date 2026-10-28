@@ -105,7 +105,7 @@ export function prepareMockArtifact({
   replace(
     "src/app/layout.tsx",
     "<body>",
-    '<body>\n        <p data-testid="mock-only-banner">TEST ONLY — deterministic mock, no live AI. Not a production release.</p>',
+    '<body>\n        <aside aria-label="Mock environment notice" data-testid="mock-only-banner">TEST ONLY — deterministic mock, no live AI. Not a production release.</aside>',
   );
   replace(
     "next.config.ts",
@@ -142,6 +142,25 @@ export function prepareMockArtifact({
   delete lock.packages["node_modules/@google/genai"];
   write("package.json", JSON.stringify(pkg, null, 2) + "\n");
   write("package-lock.json", JSON.stringify(lock, null, 2) + "\n");
+  const isWin = process.platform === "win32";
+  execFileSync(
+    isWin ? (process.env.ComSpec || "cmd.exe") : "npm",
+    isWin
+      ? [
+          "/d",
+          "/s",
+          "/c",
+          "npm install --package-lock-only --no-audit --no-fund --ignore-scripts",
+        ]
+      : [
+          "install",
+          "--package-lock-only",
+          "--no-audit",
+          "--no-fund",
+          "--ignore-scripts",
+        ],
+    { cwd: target, stdio: "pipe" },
+  );
   write(
     "scripts/mock-safety.mjs",
     readFileSync(join(sourceRoot, "verification/mock-vercel/safety.mjs")),
@@ -162,6 +181,10 @@ export function prepareMockArtifact({
   const files = Object.fromEntries(
     list(target)
       .sort()
+      .filter(
+        (p) =>
+          p.slice(target.length + 1).replaceAll("\\", "/") !== ".gitignore",
+      )
       .map((path) => [
         path.slice(target.length + 1).replaceAll("\\", "/"),
         createHash("sha256").update(readFileSync(path)).digest("hex"),

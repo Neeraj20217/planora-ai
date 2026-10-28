@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -109,6 +109,59 @@ describe("separate mock artifact construction", () => {
       writeFileSync(path, original);
     }
     expect(safety(artifact)).not.toThrow();
+  });
+  it("generates an idempotent lockfile that does not mutate under npm install", () => {
+    const lockPath = join(artifact, "package-lock.json");
+    const manifestPath = join(artifact, "ARTIFACT_MANIFEST.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const hashBefore = manifest.files["package-lock.json"];
+    expect(createHash("sha256").update(readFileSync(lockPath)).digest("hex")).toBe(hashBefore);
+    const isWin = process.platform === "win32";
+    execFileSync(
+      isWin ? (process.env.ComSpec || "cmd.exe") : "npm",
+      isWin
+        ? [
+            "/d",
+            "/s",
+            "/c",
+            "npm install --package-lock-only --no-audit --no-fund --ignore-scripts",
+          ]
+        : [
+            "install",
+            "--package-lock-only",
+            "--no-audit",
+            "--no-fund",
+            "--ignore-scripts",
+          ],
+      { cwd: artifact, stdio: "pipe" },
+    );
+    const hashAfter = createHash("sha256").update(readFileSync(lockPath)).digest("hex");
+    expect(hashAfter).toBe(hashBefore);
+  });
+  it("passes integrity and safety verification when .gitignore is absent (simulating Vercel upload)", () => {
+    const gitignorePath = join(artifact, ".gitignore");
+    let content: string | null = null;
+    if (existsSync(gitignorePath)) {
+      content = readFileSync(gitignorePath, "utf8");
+      unlinkSync(gitignorePath);
+    }
+    try {
+      expect(safety(artifact)).not.toThrow();
+    } finally {
+      if (content !== null) {
+        writeFileSync(gitignorePath, content);
+      }
+    }
+  });
+  it("detects missing required manifest files when absent", () => {
+    const filePath = join(artifact, "next.config.ts");
+    const original = readFileSync(filePath);
+    try {
+      unlinkSync(filePath);
+      expect(safety(artifact)).toThrow();
+    } finally {
+      writeFileSync(filePath, original);
+    }
   });
   it("rejects malformed or partial deployment bindings", () => {
     expect(() =>

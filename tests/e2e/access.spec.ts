@@ -76,3 +76,56 @@ test("real unconfigured access routes remain closed", async ({ page }) => {
   expect(result.status).toBe(503);
   expect(result.cookie).toBeNull();
 });
+
+test("invite code label is stacked above input with visible border and proper button spacing", async ({
+  page,
+}) => {
+  await page.goto("/access");
+  const label = page.getByText("Invite code (required)");
+  const input = page.getByLabel("Invite code (required)");
+  const redeemBtn = page.getByRole("button", { name: "Redeem invite" });
+  const signoutBtn = page.getByRole("button", { name: "Sign out" });
+
+  const labelBox = await label.boundingBox();
+  const inputBox = await input.boundingBox();
+  const redeemBox = await redeemBtn.boundingBox();
+  const signoutBox = await signoutBtn.boundingBox();
+
+  expect(labelBox).not.toBeNull();
+  expect(inputBox).not.toBeNull();
+  expect(redeemBox).not.toBeNull();
+  expect(signoutBox).not.toBeNull();
+
+  // 1. Label is strictly positioned ABOVE the input field (not beside it)
+  expect(labelBox!.y + labelBox!.height).toBeLessThanOrEqual(inputBox!.y + 1);
+
+  // 2. Input has visible border and proper minimum height
+  const inputStyles = await input.evaluate((el) => {
+    const computed = window.getComputedStyle(el);
+    return {
+      borderWidth: computed.borderWidth,
+      borderStyle: computed.borderStyle,
+      borderColor: computed.borderColor,
+      height: computed.height,
+      minHeight: computed.minHeight,
+      display: computed.display,
+      backgroundColor: computed.backgroundColor,
+    };
+  });
+
+  expect(inputStyles.display).toBe("block");
+  expect(parseFloat(inputStyles.borderWidth)).toBeGreaterThanOrEqual(1);
+  expect(inputStyles.borderStyle).toBe("solid");
+  expect(inputStyles.borderColor).not.toBe("transparent");
+  expect(parseFloat(inputStyles.height)).toBeGreaterThanOrEqual(44);
+
+  // 3. Buttons have appropriate spacing and do not overlap
+  const horizontalSeparation = signoutBox!.x >= redeemBox!.x + redeemBox!.width;
+  const verticalSeparation = signoutBox!.y >= redeemBox!.y + redeemBox!.height;
+  expect(horizontalSeparation || verticalSeparation).toBe(true);
+
+  // Save screenshot evidence for verification
+  await page.screenshot({
+    path: `C:/Users/NeerajK/.gemini/antigravity-ide/brain/76fc060f-7008-47e1-a9e0-f1947f5b1ecc/scratch/access-page-${page.viewportSize()?.width || "unknown"}.png`,
+  });
+});

@@ -1061,3 +1061,65 @@ select {
     gap: 20px 28px;
   }
 }
+
+/* Generation access form */
+.access-form {
+  max-width: 520px;
+  margin-top: 32px;
+  margin-bottom: 38px;
+}
+.access-form .field {
+  margin-bottom: 22px;
+}
+.access-help {
+  margin-top: 10px;
+  margin-bottom: 0;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.access-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.access-message {
+  min-height: 24px;
+  margin-top: 20px;
+  margin-bottom: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.access-message-error {
+  color: var(--error);
+  font-weight: 500;
+}
+.access-message-success {
+  color: var(--forest);
+  font-weight: 500;
+}
+.access-nav-links {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+.access-nav-links a {
+  color: var(--forest);
+  text-decoration: none;
+  font-weight: 500;
+}
+.access-nav-links a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .access-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .access-actions .button {
+    width: 100%;
+  }
+}
