@@ -2,6 +2,7 @@ import { geminiProvider } from "@/lib/ai/client";
 import { DEFAULT_GEMINI_MODEL } from "@/lib/ai/model";
 import { createPlanHandler } from "@/lib/server/handler";
 import { createGenerationLimiter } from "@/lib/server/rate-limit";
+import { hostedSecurity } from "@/lib/server/hosted/runtime";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -15,4 +16,5 @@ export const POST = createPlanHandler({
   }),
   provider: geminiProvider,
   acquire: limiter.acquire,
+  hostedSecurity,
 });

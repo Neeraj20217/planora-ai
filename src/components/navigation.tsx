@@ -7,6 +7,7 @@ const links = [
   { href: "/", label: "My events" },
   { href: "/events/new", label: "Create an event" },
   { href: "/guide", label: "Planning guide" },
+  { href: "/access", label: "Generation access" },
 ];
 
 export function Navigation() {

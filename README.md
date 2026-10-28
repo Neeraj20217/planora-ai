@@ -6,6 +6,8 @@ A celebration-planning workspace for weddings, birthdays, and community events.
 
 See the [minimal Phase 3 report](docs/PHASE_3_REPORT.md) and [production-readiness assessment](docs/PRODUCTION_READINESS.md) for current verification, deployment blockers and proposed costs. No live requests were made in this quality pass.
 
+**Phase 4 security implementation:** invite redemption, expiring/revocable sessions, atomic Redis quotas and leases, per-attempt provider accounting, fail-closed hosted guards and BotID wiring are implemented. Hosted generation is still **disabled by default**, pending independent review and real infrastructure verification. See the [hosted security/release runbook](docs/HOSTED_SECURITY.md) and [Phase 4 report](docs/PHASE_4_REPORT.md). No deployment or live Gemini call was performed for Phase 4.
+
 ## Challenge and approach
 
 Target: PromptWars Virtual 2026, Main Challenge 05 — Celebration & Event Planner.
@@ -58,7 +60,7 @@ The code fallback remains `gemini-3.8-flash`; the current local override is `gem
 
 Check current model availability and terms in [Google's model documentation](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash), [structured-output documentation](https://ai.google.dev/gemini-api/docs/structured-output), [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) and [pricing](https://ai.google.dev/gemini-api/docs/pricing). No fixed free quota or cost guarantee is assumed.
 
-**Local-only generation gate:** missing credentials return 503. Even with a key, generation requires explicit local enablement and a loopback host; Vercel-hosted requests are blocked. This is not a publicly deployable paid endpoint. Shared rate limiting, access/bot controls and operational spend controls must be designed and verified before enabling hosted generation in a later authorized phase. No deployment is performed here.
+**Generation gates:** missing credentials return 503. Local generation requires explicit local enablement and a loopback host. Vercel generation requires the separately gated security path documented in the hosted runbook: release approval, activation, production origin, server session, shared Redis quotas/kill state and bot verification. It remains disabled; previews are refused. External protections and hosted behavior need independent verification before activation. No deployment is performed here.
 
 ## How planning works
 
@@ -66,7 +68,7 @@ Check current model availability and terms in [Google's model documentation](htt
 Event form -> Zod validation -> review + sharing notice
   -> POST /api/plans/generate
      -> origin/content type/body limits + independent request validation
-     -> local-only activation + concurrency/request limits
+     -> local-only gate OR separately approved hosted sessions + shared limits
      -> server-only Google SDK + prompt/context + JSON schema
      -> Zod + semantic proposal checks
      -> deterministic budget/timeline/vendor composition
@@ -142,7 +144,7 @@ npm start
 
 The SDK/key live only in server modules; the adapter imports `server-only`. No `NEXT_PUBLIC_` secret exists. JSON text is rendered by React without HTML execution. Responses are `no-store`, and errors disclose no internal provider details. No CORS access is granted.
 
-Local protection permits **one active generation, three requests/minute and twenty/hour per process** (up to two provider attempts per request). These are not durable/distributed limits and reset on restart. Origin checks protect browser requests, not authorization against curl; host checks are local-development gates, not a production authentication system. Hosted generation remains blocked pending stronger controls. Budget alerts alone would not be a hard spending cap.
+Local protection permits **one active generation, three requests/minute and twenty/hour per process** (up to two provider attempts per request). These are not durable/distributed limits and reset on restart. The separately gated hosted path uses atomic Redis limits and invite sessions; it never falls back to the local limiter. Hosted generation remains blocked pending independent review/platform verification. Origin/Host checks alone are not authorization against curl. Budget alerts alone would not be a hard spending cap.
 
 Work only on `main`. Source, lockfile and tests stay below the supplied 10 MB repository limit. Dependencies, build artifacts, environments, screenshots and traces are ignored. Never commit credentials. No Vercel deployment or PromptWars submission is authorized by this release.
 

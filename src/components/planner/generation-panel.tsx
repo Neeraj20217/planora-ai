@@ -62,6 +62,14 @@ export function GenerationPanel({
             "Too many planning requests. Please wait a minute before retrying.",
           PROVIDER_LIMIT:
             "The AI provider is busy or quota is exhausted. Please wait before retrying.",
+          SESSION_REQUIRED:
+            "Generation access is missing or expired. Open Generation access in the navigation and redeem a new invite. Your brief is unchanged.",
+          ACCESS_LIMIT:
+            "Your generation allowance or the service limit has been reached. Please wait or contact the organizer. Your brief is unchanged.",
+          ACCESS_UNAVAILABLE:
+            "Hosted generation is disabled or secure access is unavailable. Your brief is unchanged.",
+          BOT_DENIED:
+            "The access check could not verify this request. Your brief is unchanged; contact the organizer.",
         };
         throw new UserPlanningError(
           messages[payload?.error?.code] ??

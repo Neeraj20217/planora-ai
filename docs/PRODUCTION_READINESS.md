@@ -1,5 +1,7 @@
 # Production-readiness assessment — 27 October 2026
 
+Historical Phase 3 assessment. Phase 4 implements the proposed core controls but keeps hosted generation disabled. See [HOSTED_SECURITY.md](HOSTED_SECURITY.md) for current implementation, setup and independent-review blockers, and [PHASE_4_REPORT.md](PHASE_4_REPORT.md) for actual local verification. No cloud protections are claimed enabled.
+
 Status: the local planner works, but hosted Gemini generation is intentionally NOT ready to enable. This assessment proposes protections; none were provisioned, enabled or deployed. Local Gemini configuration and the existing hosted gate are unchanged.
 
 ## What blocks hosted generation today

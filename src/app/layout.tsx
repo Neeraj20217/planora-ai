@@ -26,7 +26,7 @@ export default function RootLayout({
         </a>
         <header className="site-header">
           <div className="header-inner">
-            <Link href="/" className="brand" aria-label="Planora AI home">
+            <Link href="/" className="brand">
               <Flower2 aria-hidden="true" size={30} strokeWidth={1.5} />
               <span>
                 planora<span className="brand-ai">AI</span>

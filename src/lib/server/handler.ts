@@ -3,9 +3,10 @@ import { eventDetailsSchema } from "@/lib/schemas/event";
 import { todayInIndia } from "@/lib/domain/date";
 import { generatePlan, type ProposalProvider } from "@/lib/ai/generate";
 import { PlanningError } from "./errors";
+import type { HostedSecurity } from "./hosted/security";
 
 const MAX_BYTES = 32_768;
-async function readBody(request: Request) {
+export async function readBody(request: Request) {
   const length = request.headers.get("content-length");
   if (length && (!/^\d+$/.test(length) || Number(length) > MAX_BYTES))
     throw new PlanningError(
@@ -83,6 +84,7 @@ export function createPlanHandler(deps: {
   };
   provider: (key: string, model: string) => ProposalProvider;
   acquire: () => () => void;
+  hostedSecurity?: () => HostedSecurity;
   now?: () => Date;
 }) {
   return async (request: Request) => {
@@ -91,17 +93,20 @@ export function createPlanHandler(deps: {
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     };
-    let release: (() => void) | undefined;
+    let release: (() => void | Promise<void>) | undefined;
     try {
       if (request.method !== "POST")
         throw new PlanningError(405, "METHOD", "Use a POST request.");
       const url = new URL(request.url);
+      const config = deps.config();
+      const security = config.hosted ? deps.hostedSecurity?.() : undefined;
+      if (security) security.boundary(request);
       // Next may normalize request.url to localhost; Host preserves the browser authority.
       const browserURL = new URL(
         `${url.protocol}//${request.headers.get("host") ?? url.host}`,
       );
       if (
-        request.headers.get("origin") !== browserURL.origin ||
+        (!security && request.headers.get("origin") !== browserURL.origin) ||
         browserURL.username ||
         browserURL.password ||
         request.headers.get("sec-fetch-site") === "cross-site"
@@ -137,7 +142,6 @@ export function createPlanHandler(deps: {
           "INVALID_INPUT",
           "Check the event details, including date, guests and budget, then review again.",
         );
-      const config = deps.config();
       if (!config.apiKey?.trim())
         throw new PlanningError(
           503,
@@ -145,18 +149,26 @@ export function createPlanHandler(deps: {
           "AI planning is not configured on this server. Your brief is unchanged.",
         );
       if (
-        !config.localEnabled ||
-        config.hosted ||
-        !["localhost", "127.0.0.1", "[::1]"].includes(browserURL.hostname)
+        !security &&
+        (!config.localEnabled ||
+          config.hosted ||
+          !["localhost", "127.0.0.1", "[::1]"].includes(browserURL.hostname))
       )
         throw new PlanningError(
           503,
           "ENDPOINT_DISABLED",
           "AI planning is disabled on this server. Your brief is unchanged.",
         );
-      release = deps.acquire();
+      const admission = security ? await security.admit(request) : undefined;
+      release = admission ? admission.release : deps.acquire();
+      const provider = deps.provider(config.apiKey, config.model);
       const plan = await generatePlan(parsed.data.brief, {
-        provider: deps.provider(config.apiKey, config.model),
+        provider: async (prompt, signal) => {
+          await admission?.beforeAttempt();
+          if (signal.aborted)
+            throw new PlanningError(504, "TIMEOUT", "Planning timed out.");
+          return provider(prompt, signal);
+        },
         model: config.model,
         now,
         signal: request.signal,
@@ -177,7 +189,7 @@ export function createPlanHandler(deps: {
         { status: safe.status, headers },
       );
     } finally {
-      release?.();
+      await release?.();
     }
   };
 }
