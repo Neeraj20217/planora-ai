@@ -11,7 +11,7 @@ export function geminiProvider(
   const client = new GoogleGenAI({
     apiKey,
     vertexai: false,
-    httpOptions: { timeout: 20_000, retryOptions: { attempts: 1 } },
+    httpOptions: { timeout: 30_000, retryOptions: { attempts: 1 } },
   });
   return async (prompt, signal) => {
     const result = await client.models.generateContent({

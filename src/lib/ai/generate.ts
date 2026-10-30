@@ -52,7 +52,7 @@ export async function generatePlan(
 ) {
   const now = options.now ?? new Date();
   const signal = AbortSignal.any([
-    AbortSignal.timeout(options.timeoutMs ?? 35_000),
+    AbortSignal.timeout(options.timeoutMs ?? 38_000),
     ...(options.signal ? [options.signal] : []),
   ]);
   let repair = false;

@@ -115,7 +115,7 @@ describe("official SDK adapter contract (mocked)", () => {
     expect(clientOptions).toHaveBeenLastCalledWith({
       apiKey: "test-placeholder",
       vertexai: false,
-      httpOptions: { timeout: 20_000, retryOptions: { attempts: 1 } },
+      httpOptions: { timeout: 30_000, retryOptions: { attempts: 1 } },
     });
     expect(generateContent.mock.calls[0][0]).toMatchObject({
       model: "gemini-3.5-flash-lite",

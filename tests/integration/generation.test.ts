@@ -61,6 +61,30 @@ describe("provider orchestration", () => {
     expect(provider.mock.calls[0][1].aborted).toBe(true);
     expect(provider).toHaveBeenCalledTimes(1);
   });
+  it("allows slow provider responses that complete within the planning timeout budget", async () => {
+    const provider = vi.fn().mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 40));
+      return JSON.stringify(proposal);
+    });
+    const plan = await generatePlan(brief, {
+      provider,
+      model: "test-slow",
+      now: NOW,
+      timeoutMs: 150,
+    });
+    expect(plan.model).toBe("test-slow");
+    expect(provider).toHaveBeenCalledOnce();
+  });
+  it("aborts slow provider responses that exceed the timeout budget", async () => {
+    const provider = vi.fn().mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+      return JSON.stringify(proposal);
+    });
+    await expect(
+      generatePlan(brief, { provider, model: "test-timeout", timeoutMs: 30 }),
+    ).rejects.toMatchObject({ status: 504, code: "TIMEOUT" });
+    expect(provider).toHaveBeenCalledOnce();
+  });
   it("does not reveal authentication errors or retry them", async () => {
     const provider = vi
       .fn()
