@@ -534,38 +534,90 @@ input:checked + .event-type-content .selected-mark {
   border-top: 1px solid var(--line);
 }
 .home-page {
-  padding-top: 70px;
+  padding-top: 60px;
 }
 .welcome-section {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
-  gap: 70px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+  gap: 50px;
+  align-items: flex-start;
+  margin-bottom: 65px;
+}
+.hero-kicker {
+  margin-bottom: 14px;
+}
+.hero-badge {
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 75px;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--forest);
+  background: #edf3eb;
+  border: 1px solid #c9d8c6;
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 26px 0 30px;
+}
+.hero-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.highlight-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3b4e3e;
+}
+.highlight-item svg {
+  color: var(--forest);
+  flex-shrink: 0;
 }
 .planner-note {
-  padding: 30px 0 30px 30px;
-  border-left: 1px solid #b9c6b1;
+  background: #f3f5ee;
+  border: 1px solid #d4dccf;
+  border-radius: 14px;
+  padding: 26px 24px;
 }
 .planner-note .note-title {
   font-family: "Libre Baskerville", Georgia, serif;
-  font-size: 19px;
-  line-height: 1.6;
-  margin-bottom: 20px;
+  font-size: 18px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  color: var(--ink);
 }
-.planner-note ul {
+.verticals-list {
   list-style: none;
-  margin: 0 0 22px;
+  margin: 0 0 20px;
   padding: 0;
-  color: #56674f;
-  font-size: 14px;
   display: grid;
-  gap: 12px;
-}
-.planner-note > p:last-child {
-  color: var(--muted);
+  gap: 14px;
   font-size: 13px;
+  line-height: 1.55;
+  color: #4b5a49;
+}
+.verticals-list li strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.note-footer {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
   margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid #d8dfd4;
 }
 .section-heading {
   display: flex;
@@ -649,12 +701,17 @@ input:checked + .event-type-content .selected-mark {
   }
   .main-nav {
     width: 100%;
-    gap: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
     justify-content: flex-start;
   }
   .main-nav a {
     font-size: 13px;
     white-space: nowrap;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
   .page-wrap {
     padding: 25px 24px 55px;
@@ -1009,31 +1066,142 @@ select {
 .saved-events {
   list-style: none;
   padding: 0;
+  margin: 0 0 24px;
+  display: grid;
+  gap: 16px;
 }
-.saved-events li {
+.saved-event-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 24px 0;
-  border-top: 1px solid var(--line);
+  gap: 24px;
+  padding: 22px 24px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.saved-events li > div {
+.saved-event-card:hover {
+  border-color: #b9c7b2;
+  box-shadow: 0 3px 10px rgba(38, 61, 52, 0.04);
+}
+.saved-event-body {
   min-width: 0;
+  flex: 1;
 }
-.saved-events h3 {
-  font-size: 21px;
-  margin-bottom: 8px;
-  overflow-wrap: anywhere;
+.saved-event-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
 }
-.saved-events p {
+.event-type-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: 4px;
+}
+.event-badge-wedding {
+  background: #fbf1ec;
+  color: #8c3b28;
+  border: 1px solid #edd5cb;
+}
+.event-badge-birthday {
+  background: #fef7e8;
+  color: #875713;
+  border: 1px solid #f3e1bf;
+}
+.event-badge-community {
+  background: #eef6eb;
+  color: #275631;
+  border: 1px solid #d0e2cb;
+}
+.saved-event-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 13px;
   color: var(--muted);
-  margin: 5px 0;
+}
+.saved-event-title {
+  font-family: "Libre Baskerville", Georgia, serif;
+  font-size: 20px;
+  font-weight: 400;
+  margin: 4px 0 10px;
   overflow-wrap: anywhere;
 }
-.saved-events .button {
+.saved-event-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.saved-event-title a:hover {
+  color: var(--forest);
+  text-decoration: underline;
+}
+.saved-event-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.detail-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.detail-item svg {
+  color: #4b604e;
   flex-shrink: 0;
+}
+.saved-event-progress {
+  max-width: 380px;
+}
+.progress-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.progress-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #3b4e3e;
+  font-weight: 500;
+}
+.progress-label svg {
+  color: var(--forest);
+}
+.progress-stat {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.progress-track {
+  height: 6px;
+  width: 100%;
+  background: #e8ede4;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--forest);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.saved-event-action .button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 @media (max-width: 760px) {
   .dashboard-heading {
@@ -1053,9 +1221,26 @@ select {
   .warning-section {
     padding: 23px 20px;
   }
-  .saved-events li {
+  .saved-event-card {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    gap: 18px;
+    padding: 18px 18px;
+  }
+  .saved-event-progress {
+    max-width: none;
+  }
+  .saved-event-action .button {
+    width: 100%;
+    justify-content: center;
+  }
+  .welcome-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .welcome-actions .button {
+    width: 100%;
+    justify-content: center;
   }
   .event-facts {
     gap: 20px 28px;

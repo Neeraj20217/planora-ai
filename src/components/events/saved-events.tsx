@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarHeart, Plus } from "lucide-react";
+import {
+  CalendarHeart,
+  Plus,
+  ArrowRight,
+  Calendar,
+  MapPin,
+  Users,
+  IndianRupee,
+  CheckCircle2,
+} from "lucide-react";
 import { useSavedPlans } from "@/lib/storage/use-saved-plans";
 import { formatEventDate } from "@/lib/domain/date";
 import { EVENT_TYPE_LABELS } from "@/lib/schemas/event";
@@ -23,33 +32,83 @@ export function SavedEvents() {
         </p>
       ))}
       {plans.length ? (
-        <ul className="saved-events">
-          {plans.map((plan) => (
-            <li key={plan.id}>
-              <div>
-                <h3>
-                  <Link href={`/events/${plan.id}`}>{plan.details.name}</Link>
-                </h3>
-                <p>
-                  {EVENT_TYPE_LABELS[plan.details.eventType]} ·{" "}
-                  {formatEventDate(plan.details.date)} · {plan.details.location}
-                </p>
-                <p>
-                  {plan.details.guests} guests ·{" "}
-                  {formatINR(plan.details.budgetPaise)} ·{" "}
-                  {plan.tasks.filter((task) => task.completed).length}/
-                  {plan.tasks.length} tasks complete
-                </p>
-              </div>
-              <Link
-                href={`/events/${plan.id}`}
-                className="button button-secondary"
-                aria-label={`Open ${plan.details.name}`}
-              >
-                Open plan
-              </Link>
-            </li>
-          ))}
+        <ul className="saved-events" aria-label="Saved events list">
+          {plans.map((plan) => {
+            const totalTasks = plan.tasks.length;
+            const completedTasks = plan.tasks.filter((task) => task.completed).length;
+            const progressPercent =
+              totalTasks > 0
+                ? Math.round((completedTasks / totalTasks) * 100)
+                : 0;
+
+            return (
+              <li key={plan.id} className="saved-event-card">
+                <div className="saved-event-body">
+                  <div className="saved-event-top">
+                    <span
+                      className={`event-type-badge event-badge-${plan.details.eventType}`}
+                    >
+                      {EVENT_TYPE_LABELS[plan.details.eventType]}
+                    </span>
+                    <span className="saved-event-date">
+                      <Calendar aria-hidden="true" size={13} />
+                      {formatEventDate(plan.details.date)}
+                    </span>
+                  </div>
+
+                  <h3 className="saved-event-title">
+                    <Link href={`/events/${plan.id}`}>{plan.details.name}</Link>
+                  </h3>
+
+                  <div className="saved-event-details">
+                    <span className="detail-item">
+                      <MapPin aria-hidden="true" size={14} />
+                      {plan.details.location}
+                    </span>
+                    <span className="detail-item">
+                      <Users aria-hidden="true" size={14} />
+                      {plan.details.guests.toLocaleString("en-IN")} guests
+                    </span>
+                    <span className="detail-item">
+                      <IndianRupee aria-hidden="true" size={14} />
+                      {formatINR(plan.details.budgetPaise)}
+                    </span>
+                  </div>
+
+                  <div
+                    className="saved-event-progress"
+                    aria-label={`Task progress: ${completedTasks} of ${totalTasks} tasks complete (${progressPercent}%)`}
+                  >
+                    <div className="progress-info">
+                      <span className="progress-label">
+                        <CheckCircle2 aria-hidden="true" size={13} />
+                        Preparation progress
+                      </span>
+                      <span className="progress-stat">
+                        {completedTasks} / {totalTasks} tasks ({progressPercent}%)
+                      </span>
+                    </div>
+                    <div className="progress-track" aria-hidden="true">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="saved-event-action">
+                  <Link
+                    href={`/events/${plan.id}`}
+                    className="button button-secondary"
+                    aria-label={`Open ${plan.details.name}`}
+                  >
+                    Open plan <ArrowRight aria-hidden="true" size={15} />
+                  </Link>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : !error ? (
         <div className="empty-events">
