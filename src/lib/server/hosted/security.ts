@@ -2,7 +2,7 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 import { isIP } from "node:net";
 import { PlanningError } from "../errors";
 import { redisREST, unavailable, type RedisCommand } from "./redis";
-import { ADMIT, ATTEMPT, REDEEM, RELEASE, SESSION } from "./scripts";
+import { ADMIT, ATTEMPT, REDEEM, RELEASE, SESSION, TRIAL } from "./scripts";
 
 export const COOKIE = "__Host-planora-session";
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
@@ -157,6 +157,41 @@ export function createHostedSecurity(
         [config.prefix + "session:" + hashToken(token)],
         [config.prefix, ip, invite],
       );
+      if (
+        typeof ttl !== "number" ||
+        !Number.isInteger(ttl) ||
+        ttl <= 0 ||
+        ttl > 28800
+      )
+        return unavailable();
+      return sessionCookie(token, ttl);
+    },
+    async trial(request: Request) {
+      const ip = boundary(request);
+      await bot();
+      const trialInvite = hashToken("trial:" + randomBytes(32).toString("base64url"));
+      const token = randomBytes(32).toString("base64url");
+      const ttl = await evalScript(
+        TRIAL,
+        [config.prefix + "session:" + hashToken(token)],
+        [config.prefix, ip, trialInvite],
+      );
+      if (ttl === "CLAIMED") {
+        throw new PlanningError(
+          429,
+          "ACCESS_LIMIT",
+          "The daily public evaluation limit for your connection (2 live plans) has been reached. For extended testing, enter an organizer invite code on the Generation access page.",
+          3600,
+        );
+      }
+      if (ttl === "RATE") {
+        throw new PlanningError(
+          429,
+          "ACCESS_LIMIT",
+          "Too many evaluation attempts. Please wait a minute before retrying.",
+          60,
+        );
+      }
       if (
         typeof ttl !== "number" ||
         !Number.isInteger(ttl) ||

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, FileText } from "lucide-react";
 import type { EventDetails } from "@/types";
 import { planSchema, type EventPlan } from "@/lib/schemas/plan";
+import { getSamplePlan } from "@/lib/domain/sample-plans";
 
 class UserPlanningError extends Error {}
 
@@ -37,12 +38,50 @@ export function GenerationPanel({
     try {
       const response = await fetch("/api/plans/generate", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brief: details }),
         signal,
       });
-      const payload = await response.json();
+      let payload = await response.json().catch(() => null);
       if (!response.ok) {
+        if (payload?.error?.code === "SESSION_REQUIRED") {
+          try {
+            const trialRes = await fetch("/api/access/trial", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+              signal,
+            });
+            if (trialRes.ok) {
+              const retryRes = await fetch("/api/plans/generate", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ brief: details }),
+                signal,
+              });
+              payload = await retryRes.json().catch(() => null);
+              if (retryRes.ok) {
+                const plan = planSchema.parse(payload.plan);
+                if (JSON.stringify(plan.details) !== JSON.stringify(details))
+                  throw new UserPlanningError(
+                    "The response did not match your event details. No plan was saved; please retry.",
+                  );
+                onGenerated(plan);
+                return;
+              }
+            } else {
+              const trialData = await trialRes.json().catch(() => null);
+              if (trialData?.error?.message) {
+                throw new UserPlanningError(trialData.error.message);
+              }
+            }
+          } catch (trialErr) {
+            if (trialErr instanceof UserPlanningError) throw trialErr;
+          }
+        }
         if (response.status === 429) setRetryAt(Date.now() + 60_000);
         // Never render arbitrary provider/internal error text.
         const messages: Record<string, string> = {
@@ -63,9 +102,9 @@ export function GenerationPanel({
           PROVIDER_LIMIT:
             "The AI provider is busy or quota is exhausted. Please wait before retrying.",
           SESSION_REQUIRED:
-            "Generation access is missing or expired. Open Generation access in the navigation and redeem a new invite. Your brief is unchanged.",
+            "Generation access is missing or expired. Click Start Evaluation Session on the access page or enter an organizer invite code.",
           ACCESS_LIMIT:
-            "Your generation allowance or the service limit has been reached. Please wait or contact the organizer. Your brief is unchanged.",
+            "Your generation allowance or the daily service cap was reached. Please wait or contact the organizer.",
           ACCESS_UNAVAILABLE:
             "Hosted generation is disabled or secure access is unavailable. Your brief is unchanged.",
           BOT_DENIED:
@@ -83,7 +122,7 @@ export function GenerationPanel({
         );
       onGenerated(plan);
     } catch (issue) {
-      if (controller.current.signal.aborted) return;
+      if (controller.current?.signal.aborted) return;
       setError(
         signal.aborted
           ? "Generation timed out. Your brief is unchanged; please retry."
@@ -107,15 +146,17 @@ export function GenerationPanel({
         Choosing Generate plan sends this brief to Google Gemini. Avoid
         sensitive personal information.
       </p>
-      <button
-        type="button"
-        className="button button-primary"
-        onClick={generate}
-        disabled={pending}
-      >
-        <Sparkles aria-hidden="true" size={18} />
-        {pending ? "Planning your celebration…" : "Generate plan"}
-      </button>
+      <div className="generation-actions">
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={generate}
+          disabled={pending}
+        >
+          <Sparkles aria-hidden="true" size={18} />
+          {pending ? "Planning your celebration…" : "Generate plan"}
+        </button>
+      </div>
       {pending ? (
         <p role="status">
           Generating and checking your plan. This may take up to 45 seconds.
@@ -123,10 +164,23 @@ export function GenerationPanel({
         </p>
       ) : null}
       {error ? (
-        <p className="error-summary" role="alert">
-          {error}
-        </p>
+        <div className="generation-fallback">
+          <p className="error-summary" role="alert">
+            {error}
+          </p>
+          <div style={{ marginTop: "12px" }}>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => onGenerated(getSamplePlan(details.eventType, details))}
+            >
+              <FileText aria-hidden="true" size={18} />
+              Explore sample plan (offline reference)
+            </button>
+          </div>
+        </div>
       ) : null}
     </section>
   );
 }
+

@@ -7,5 +7,6 @@ if (!["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname))
     protect: [
       { path: "/api/plans/generate", method: "POST" },
       { path: "/api/access/redeem", method: "POST" },
+      { path: "/api/access/trial", method: "POST" },
     ],
   });

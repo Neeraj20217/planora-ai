@@ -10,6 +10,7 @@ import {
 import { redisREST } from "@/lib/server/hosted/redis";
 import { createPlanHandler } from "@/lib/server/handler";
 import { accessHandler } from "@/lib/server/hosted/access";
+import { ADMIT } from "@/lib/server/hosted/scripts";
 import { luaRedis } from "../fixtures/lua-redis";
 import { NOW, brief, proposal } from "../fixtures/planning";
 
@@ -35,8 +36,9 @@ function request(
     body: JSON.stringify(body),
   });
 }
-async function harness() {
+async function harness(redisTime?: number) {
   const redis = luaRedis();
+  if (redisTime !== undefined) redis.run(`now = ${redisTime}`);
   const config: HostedConfig = {
     origin,
     prefix,
@@ -441,5 +443,177 @@ describe("configuration and REST transport fail closed", () => {
       )(["GET", "test"]),
     ).rejects.toMatchObject({ status: 503 });
     expect(hung).toHaveBeenCalledOnce();
+  });
+});
+
+describe("public evaluation trial security and quota enforcement", () => {
+  const beforeMidnight = Date.parse("2026-10-30T23:59:00Z") / 1000;
+  async function claim(h: Awaited<ReturnType<typeof harness>>) {
+    const response = await accessHandler(() => h.security, "trial")(
+      request({ "x-vercel-forwarded-for": "198.51.100.10" }),
+    );
+    expect(response.status).toBe(200);
+    const cookie = response.headers.get("set-cookie")!.split(";")[0];
+    const sessionToken = cookie.slice(COOKIE.length + 1);
+    const invite = await h.command(["GET", prefix + "session:" + hashToken(sessionToken)]);
+    return { cookie, usedKey: prefix + "trial-used:" + invite };
+  }
+
+  it.each([0, 1, 2])("keeps two lifetime generations across UTC midnight with %i used before midnight", async usedBefore => {
+    const h = await harness(beforeMidnight);
+    const trial = await claim(h);
+    for (let i = 0; i < usedBefore; i++)
+      expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(200);
+    h.redis.advance(121);
+    for (let i = usedBefore; i < 2; i++)
+      expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(200);
+    expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(429);
+    expect(h.provider).toHaveBeenCalledTimes(2);
+    expect(await h.command(["GET", trial.usedKey])).toBe("2");
+  });
+
+  it("atomically reserves the final lifetime slot during simultaneous requests after midnight", async () => {
+    const h = await harness(beforeMidnight);
+    const trial = await claim(h);
+    expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(200);
+    h.redis.advance(121);
+    let finish!: () => void;
+    const held = new Promise<void>(resolve => { finish = resolve; });
+    h.provider.mockImplementation(async () => { await held; return JSON.stringify(proposal); });
+    let rejections = 0;
+    const pending = ["198.51.100.20", "198.51.100.21"].map(ip =>
+      h.handler()(request({ cookie: trial.cookie, "x-vercel-forwarded-for": ip })).then(response => {
+        if (response.status === 429) rejections++;
+        return response;
+      }),
+    );
+    try {
+      await vi.waitFor(() => {
+        expect(h.provider).toHaveBeenCalledTimes(2);
+        expect(rejections).toBe(1);
+      });
+    } finally { finish(); }
+    const responses = await Promise.all(pending);
+    expect(responses.map(r => r.status).sort()).toEqual([200, 429]);
+    expect(await h.command(["GET", trial.usedKey])).toBe("2");
+    expect((await h.handler()(request({ cookie: trial.cookie, "x-vercel-forwarded-for": "198.51.100.22" }))).status).toBe(429);
+    expect(h.provider).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["missing", "expired"])("fails closed on a %s lifetime counter without recreating it", async state => {
+    const h = await harness();
+    const trial = await claim(h);
+    if (state === "missing") await h.command(["DEL", trial.usedKey]);
+    else { await h.command(["EXPIRE", trial.usedKey, 1]); h.redis.advance(2); }
+    expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(429);
+    expect(h.provider).not.toHaveBeenCalled();
+    expect(await h.command(["GET", trial.usedKey])).toBeNull();
+  });
+
+  it("does not extend the eight-hour lifetime or refund failed generations", async () => {
+    const h = await harness();
+    const trial = await claim(h);
+    h.redis.advance(61);
+    h.provider.mockRejectedValue({ status: 401 });
+    for (let i = 0; i < 2; i++)
+      expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(503);
+    expect(await h.command(["GET", trial.usedKey])).toBe("2");
+    expect(await h.command(["TTL", trial.usedKey])).toBe(28800 - 61);
+    expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(429);
+    expect(h.provider).toHaveBeenCalledTimes(2);
+    h.redis.advance(28800 - 61);
+    expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(401);
+    expect(h.provider).toHaveBeenCalledTimes(2);
+  });
+
+  it("blocks Redis admission errors without reserving a slot or calling the provider", async () => {
+    const h = await harness();
+    const trial = await claim(h);
+    h.command.mockImplementation(async args => {
+      if (args[0] === "EVAL" && args[1] === ADMIT) throw new Error("simulated Redis outage");
+      return h.redis.command(args);
+    });
+    expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(503);
+    expect(h.provider).not.toHaveBeenCalled();
+    expect(await h.command(["GET", trial.usedKey])).toBe("0");
+  });
+
+  it("blocks an existing trial when the emergency state is disabled", async () => {
+    const h = await harness();
+    const trial = await claim(h);
+    await h.command(["DEL", prefix + "generation-state"]);
+    expect((await h.handler()(request({ cookie: trial.cookie }))).status).toBe(503);
+    expect(h.provider).not.toHaveBeenCalled();
+    expect(await h.command(["GET", trial.usedKey])).toBe("0");
+  });
+
+  it("preserves private invitations' five-per-UTC-day policy across midnight", async () => {
+    const h = await harness(beforeMidnight);
+    const privateCookie = (await h.security.redeem(request(), code)).split(";")[0];
+    for (let i = 0; i < 2; i++) expect((await h.handler()(request({ cookie: privateCookie }))).status).toBe(200);
+    h.redis.advance(121);
+    for (let i = 0; i < 5; i++) {
+      expect((await h.handler()(request({ cookie: privateCookie }))).status).toBe(200);
+      h.redis.advance(61);
+    }
+    expect((await h.handler()(request({ cookie: privateCookie }))).status).toBe(429);
+    expect(h.provider).toHaveBeenCalledTimes(7);
+    expect(await h.command(["GET", prefix + "trial-used:" + hashToken(code)])).toBeNull();
+  });
+
+  it("issues an evaluation trial session and enforces the 2-generation ceiling", async () => {
+    const h = await harness();
+    const trialHandler = accessHandler(() => h.security, "trial");
+    const trialRes = await trialHandler(request({ "x-vercel-forwarded-for": "198.51.100.10" }));
+    expect(trialRes.status).toBe(200);
+    const setCookie = trialRes.headers.get("set-cookie");
+    expect(setCookie).toContain(COOKIE);
+    const rawCookie = setCookie!.split(";")[0];
+
+    // Generation 1: Succeeds
+    const gen1 = await h.handler()(request({ cookie: rawCookie, "x-vercel-forwarded-for": "198.51.100.10" }));
+    expect(gen1.status).toBe(200);
+
+    // Generation 2: Succeeds
+    h.redis.advance(61);
+    const gen2 = await h.handler()(request({ cookie: rawCookie, "x-vercel-forwarded-for": "198.51.100.10" }));
+    expect(gen2.status).toBe(200);
+
+    // Generation 3: Fails closed with 429 (quota reached)
+    h.redis.advance(61);
+    const gen3 = await h.handler()(request({ cookie: rawCookie, "x-vercel-forwarded-for": "198.51.100.10" }));
+    expect(gen3.status).toBe(429);
+    expect(h.provider).toHaveBeenCalledTimes(2);
+  });
+
+  it("enforces 1 trial claim per IP per day", async () => {
+    const h = await harness();
+    const trialHandler = accessHandler(() => h.security, "trial");
+    const res1 = await trialHandler(request({ "x-vercel-forwarded-for": "198.51.100.20" }));
+    expect(res1.status).toBe(200);
+
+    // Second claim from same IP is refused with 429
+    const res2 = await trialHandler(request({ "x-vercel-forwarded-for": "198.51.100.20" }));
+    expect(res2.status).toBe(429);
+
+    // Different IP can still claim
+    const res3 = await trialHandler(request({ "x-vercel-forwarded-for": "198.51.100.21" }));
+    expect(res3.status).toBe(200);
+  });
+
+  it("rejects trial session when BotID verification fails or times out", async () => {
+    const h = await harness();
+    h.bot.mockResolvedValue(false);
+    const trialHandler = accessHandler(() => h.security, "trial");
+    const res = await trialHandler(request({ "x-vercel-forwarded-for": "198.51.100.30" }));
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects trial session when Redis kill switch is not enabled", async () => {
+    const h = await harness();
+    await h.command(["DEL", prefix + "generation-state"]);
+    const trialHandler = accessHandler(() => h.security, "trial");
+    const res = await trialHandler(request({ "x-vercel-forwarded-for": "198.51.100.40" }));
+    expect(res.status).toBe(503);
   });
 });

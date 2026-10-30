@@ -5,7 +5,7 @@ import type { HostedSecurity } from "./security";
 
 export function accessHandler(
   getSecurity: () => HostedSecurity,
-  action: "redeem" | "logout",
+  action: "redeem" | "logout" | "trial",
 ) {
   return async (request: Request) => {
     const headers: Record<string, string> = {
@@ -28,7 +28,7 @@ export function accessHandler(
       const schema =
         action === "redeem"
           ? z.object({ code: z.string().max(256) }).strict()
-          : z.object({}).strict();
+          : z.record(z.string(), z.unknown());
       const parsed = schema.safeParse(await readBody(request));
       if (!parsed.success)
         throw new PlanningError(400, "INVALID_INPUT", "Check the access form.");
@@ -36,12 +36,11 @@ export function accessHandler(
         action === "redeem"
           ? await security.redeem(
               request,
-              z
-                .object({ code: z.string().max(256) })
-                .strict()
-                .parse(parsed.data).code,
+              (parsed.data as { code: string }).code,
             )
-          : await security.logout(request);
+          : action === "trial"
+            ? await security.trial(request)
+            : await security.logout(request);
       return Response.json({ ok: true }, { headers });
     } catch (error) {
       const safe =

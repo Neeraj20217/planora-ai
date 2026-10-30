@@ -121,4 +121,30 @@ describe("AccessForm UI and Accessibility", () => {
 
     fetchMock.mockRestore();
   });
+
+  it("activates evaluation access when clicking Start evaluation session", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ ok: true }, { status: 200 })
+    );
+
+    const user = userEvent.setup();
+    render(<AccessForm />);
+
+    const trialBtn = screen.getByRole("button", { name: "Start evaluation session" });
+    expect(trialBtn).toBeInTheDocument();
+    await user.click(trialBtn);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/access/trial",
+      expect.objectContaining({
+        method: "POST",
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("Evaluation access granted");
+    });
+
+    fetchMock.mockRestore();
+  });
 });

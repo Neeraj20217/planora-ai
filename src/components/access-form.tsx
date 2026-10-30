@@ -12,7 +12,7 @@ export function AccessForm() {
   useEffect(() => {
     if (error && !busy) input.current?.focus();
   }, [error, busy]);
-  async function submit(action: "redeem" | "logout") {
+  async function submit(action: "redeem" | "logout" | "trial") {
     if (busy) return;
     setBusy(true);
     setMessage("");
@@ -31,17 +31,21 @@ export function AccessForm() {
       });
       if (!response.ok)
         throw new Error(
-          "Access could not be completed. Your invite may be invalid, expired or already used, a limit may have been reached, or hosted access may be disabled. Ask the organizer before retrying.",
+          action === "trial"
+            ? "Evaluation access limit reached for your connection (2 plans/day), or the service cap was reached. Enter an organizer invite code to continue."
+            : "Access could not be completed. Your invite may be invalid, expired or already used, a limit may have been reached, or hosted access may be disabled. Ask the organizer before retrying.",
         );
       setMessage(
         action === "redeem"
           ? "Generation access granted for this browser until the session expires. You can create an event now."
-          : "Signed out. This session can no longer generate plans.",
+          : action === "trial"
+            ? "Evaluation access granted (2 live generations remaining). You can create an event now."
+            : "Signed out. This session can no longer generate plans.",
       );
     } catch (failure) {
       setError(true);
       setMessage(
-        failure instanceof Error && failure.message.startsWith("Access could")
+        failure instanceof Error && (failure.message.startsWith("Access could") || failure.message.startsWith("Evaluation access"))
           ? failure.message
           : "Access could not be completed. Please try later.",
       );
@@ -56,9 +60,9 @@ export function AccessForm() {
       </Link>
       <h1>Generation access</h1>
       <p className="intro">
-        Enter the single-use invite supplied by the organizer. Access expires
-        within eight hours and enables limited AI generation, without uploading
-        your saved plans.
+        Enter the single-use invite supplied by the organizer, or start an
+        instant evaluation session for PromptWars Challenge 05 without an
+        invite code.
       </p>
       <form
         aria-busy={busy}
@@ -83,9 +87,8 @@ export function AccessForm() {
             disabled={busy}
           />
           <p id="invite-help" className="field-hint access-help">
-            Do not share this code. It is sent securely to the server and is
-            cleared after submission. Hosted access is disabled until release
-            approval.
+            Do not share this code. Enter an organizer invite for extended access,
+            or click Start evaluation session below for an instant trial (2 live generations).
           </p>
         </div>
         <div className="access-actions">
@@ -95,6 +98,14 @@ export function AccessForm() {
             type="submit"
           >
             {busy ? "Please wait…" : "Redeem invite"}
+          </button>
+          <button
+            className="button button-secondary"
+            disabled={busy}
+            type="button"
+            onClick={() => void submit("trial")}
+          >
+            Start evaluation session
           </button>
           <button
             className="button button-secondary"
