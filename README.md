@@ -7,7 +7,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-24.x%20LTS-green?style=flat-square)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.4.3-black?style=flat-square)](https://nextjs.org/)
 [![Model](https://img.shields.io/badge/Google%20Gemini-3.5%20Flash--Lite-orange?style=flat-square)](https://ai.google.dev/)
-[![Tests](https://img.shields.io/badge/Tests-217%20Passed-brightgreen?style=flat-square)](https://github.com/Neeraj20217/planora-ai)
+[![Tests](https://img.shields.io/badge/Tests-222%20Passed-brightgreen?style=flat-square)](https://github.com/Neeraj20217/planora-ai)
 
 ---
 
@@ -79,7 +79,7 @@ Planora AI supports the three mandatory event verticals defined in Challenge 05:
   ├── 7. Google Gemini 3.5 Flash-Lite (@google/genai SDK v2.31.0)
   │     ├── Temperature: 0.2 (deterministic output)
   │     ├── Structured Output Schema (Zod -> JSON Schema)
-  │     └── Strict 20s call timeout / 35s overall pipeline deadline
+  │     └── Strict 30s call timeout / 38s overall pipeline deadline
   │
   ├── 8. Deterministic Domain Composition
   │     ├── Integer-paise budget allocation (Contingency + Largest Remainder)
@@ -208,8 +208,8 @@ npm run build
 ```
 
 **Results:**
-- **12 Test Files Passed** (100%)
-- **217 Automated Tests Passed** (0 failures)
+- **13 Test Files Passed** (100%)
+- **222 Automated Tests Passed** (0 failures)
 - TypeScript strict typecheck: 0 errors.
 - ESLint: 0 warnings, 0 errors.
 - Production build: Compiled cleanly with static & dynamic routes.
@@ -217,15 +217,10 @@ npm run build
 ### Live Production Verification
 - **Test Date:** October 30, 2026.
 - **Model:** Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`).
-- **Live Tested Event:** Birthday celebration (₹30,000 budget, Hyderabad, 25 guests).
-- **Verified Outputs:**
-  - Real-time AI generation of personalized recommendations.
-  - Exact ₹30,000 budget allocation across 5 spending categories plus contingency.
-  - 9 timeline tasks with interactive completion checkboxes.
-  - Essential vendor checklist with selectable engagement statuses.
-  - Personalized creative ideas tailored to the birthday brief.
-  - Browser save, refresh, and reopen persistence verified on production.
-- **Event Scope Note:** Live hosted generation was verified for the **Birthday** vertical; **Wedding** and **Community** planning models are fully implemented and verified via automated test suites and offline reference fixtures.
+- **Live Tested Events:**
+  1. **Wedding Celebration**: ₹800,000 budget, 250 guests, Hyderabad, floral theme with vegetarian catering and accessibility needs. Generated in **7 seconds**. Exact ₹800,000 allocation across 7 categories including ₹80,000 (10%) contingency, 10 timeline tasks, 4 vendor categories, personalized lounge/decor ideas, and browser persistence verified on production.
+  2. **Birthday Celebration**: ₹30,000 budget, 25 guests, Hyderabad. Exact ₹30,000 allocation across 5 categories plus contingency, 9 timeline tasks, vendor checklist, and browser persistence verified on production.
+- **Event Scope Note:** Live hosted generation was verified on production for **Wedding** and **Birthday** verticals; **Community** planning models and schemas are verified via automated component and integration test suites and offline reference fixtures.
 
 ---
 
@@ -239,14 +234,14 @@ Competition judges can evaluate Planora AI using either of two supported paths:
 3. Click **"Start evaluation session"**.
    - *This grants an instant, code-free 8-hour trial session (allowing up to 2 live Gemini generations per connection).*
 4. Navigate to **"Create an event"** (`/events/new`).
-5. Choose an event type (**Birthday**, **Wedding**, or **Community Event**), fill in details, and click **"Review event brief"**.
+5. Choose an event type (**Birthday**, **Wedding**, or **Community Event**), fill in details, and click **"Review event details"**.
 6. Click **"Generate plan"**. Gemini 3.5 Flash-Lite will synthesize your custom plan.
 7. Interact with timeline checkboxes, adjust vendor statuses, and click **"Save plan"**. Refresh or return to "My events" to verify persistent local storage.
 
 ### Option B: Offline Reference Mode (Guaranteed Access)
 If the shared daily evaluation quota is reached or hosted generation is closed:
 1. Navigate to **"Create an event"** (`/events/new`).
-2. Fill in event details and click **"Review event brief"**.
+2. Fill in event details and click **"Review event details"**.
 3. Click **"Explore sample plan (offline reference)"**.
 4. The application renders full, pre-computed canonical plans for Weddings, Birthdays, or Community events with honest provenance labeling (`Offline Reference Sample`), allowing full evaluation of UI, budget math, timelines, and vendor checklists.
 
