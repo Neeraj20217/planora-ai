@@ -51,7 +51,7 @@ Planora AI supports the three mandatory event verticals defined in Challenge 05:
 - **Dependency-Aware Interactive Timeline**: Milestone scheduling with completion tracking, progress indicators, and overdue warnings.
 - **Interactive Vendor Checklist**: Essential vs. optional vendor identification with editable engagement statuses (`researching`, `contacted`, `booked`).
 - **Personalized Ideas & Trade-Offs**: Creative theme concepts, entertainment ideas, and actionable cost-saving tips tailored to event scale.
-- **Offline Persistence & Zero Lock-In**: Client-side versioned `localStorage` (`planora:plan:v1:<uuid>`) with exportable view, stale-write detection, and zero attendee tracking.
+- **Offline Persistence & Zero Lock-In**: Client-side versioned `localStorage` (`planora:plan:v1:<uuid>`) with in-browser save and reopen, stale-write detection, and zero attendee tracking.
 - **Offline Reference Fallback**: Pre-computed canonical sample plans accessible for all three verticals when quotas or operator kill switches are active.
 
 ---
@@ -217,14 +217,14 @@ npm run build
 ### Live Production Verification
 - **Test Date:** October 30, 2026.
 - **Model:** Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`).
-- **Live Tested Event:** Birthday celebration (₹30,000 budget, Bangalore, 25 guests).
+- **Live Tested Event:** Birthday celebration (₹30,000 budget, Hyderabad, 25 guests).
 - **Verified Outputs:**
   - Real-time AI generation of personalized recommendations.
-  - Exact ₹30,000 budget distribution across 6 categories + 10% contingency.
-  - 9 timeline milestones with completion checkboxes.
-  - Essential vendor checklist with interactive status selectors.
-  - Custom creative themes and return gift ideas.
-  - Browser save and reopen persistence verified across reloads.
+  - Exact ₹30,000 budget allocation across 5 spending categories plus contingency.
+  - 9 timeline tasks with interactive completion checkboxes.
+  - Essential vendor checklist with selectable engagement statuses.
+  - Personalized creative ideas tailored to the birthday brief.
+  - Browser save, refresh, and reopen persistence verified on production.
 - **Event Scope Note:** Live hosted generation was verified for the **Birthday** vertical; **Wedding** and **Community** planning models are fully implemented and verified via automated test suites and offline reference fixtures.
 
 ---
@@ -279,4 +279,4 @@ planora-ai/
 
 ---
 
-*Submitted for PromptWars Virtual 2026 — Challenge 05. Built with Google Gemini.*
+*Built for PromptWars Virtual 2026 — Main Challenge 05. Powered by Google Gemini.*
