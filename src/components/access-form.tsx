@@ -3,18 +3,28 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { ArrowLeft } from "lucide-react";
+import { ApiResponseError, accessResponseSchema, fetchApi, readApiResponse, retryAfterMs, cooldownMessage } from "@/lib/api-response";
+type AccessAction = "redeem" | "logout" | "trial";
 
 export function AccessForm() {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
-  const [errorAction, setErrorAction] = useState<string | null>(null);
+  const [errorAction, setErrorAction] = useState<AccessAction | null>(null);
   useEffect(() => {
     if (error && !busy && errorAction === "redeem") input.current?.focus();
   }, [error, busy, errorAction]);
-  async function submit(action: "redeem" | "logout" | "trial") {
+  const [retryAt, setRetryAt] = useState<Partial<Record<AccessAction, number>>>({});
+  async function submit(action: AccessAction) {
     if (busy) return;
+    const until = retryAt[action] ?? 0;
+    if (Date.now() < until) {
+      setError(true);
+      setErrorAction(action);
+      setMessage(cooldownMessage(until));
+      return;
+    }
     setBusy(true);
     setMessage("");
     setError(false);
@@ -23,7 +33,7 @@ export function AccessForm() {
     // Keep the code out of component state and clear it on every attempt.
     if (input.current) input.current.value = "";
     try {
-      const response = await fetch(`/api/access/${action}`, {
+      const response = await fetchApi(`/api/access/${action}`, {
         method: "POST",
         credentials: "same-origin",
         cache: "no-store",
@@ -31,9 +41,11 @@ export function AccessForm() {
         body: JSON.stringify(action === "redeem" ? { code } : {}),
         signal: AbortSignal.timeout(10_000),
       });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        const code = payload?.error?.code;
+      const delay = retryAfterMs(response);
+      if (delay > 0) setRetryAt(current => ({ ...current, [action]: Date.now() + delay }));
+      const payload = await readApiResponse(response, accessResponseSchema);
+      if (!payload.ok) {
+        const code = payload.error.code;
         const unavailable = code === "ACCESS_UNAVAILABLE" || response.status >= 500;
         const denied = code === "BOT_DENIED" || code === "ORIGIN" || code === "CLIENT_IP";
         const message = action === "logout"
@@ -58,8 +70,14 @@ export function AccessForm() {
             ? "Evaluation access granted: up to 2 generation requests during this 8-hour session. You can create an event now."
             : "Signed out. This session can no longer generate plans.",
       );
-    } catch {
+    } catch (issue) {
       setError(true);
+      if (issue instanceof ApiResponseError && issue.kind === "invalid-response") {
+        setMessage(action === "logout"
+          ? "Sign out could not be confirmed: the server returned an invalid response. Please try later."
+          : "The server returned an invalid access response. Please try later; offline reference plans remain available.");
+        return;
+      }
       setMessage(action === "logout"
         ? "Sign out could not be confirmed because the request failed or timed out. Please retry; this browser may still have an active session."
         : "Access could not be completed because the request failed or timed out. Please try later; offline reference plans remain available.");

@@ -81,7 +81,7 @@ test("invalid access is announced and returns keyboard focus without echoing a c
   await page.route("**/api/access/redeem", (route) =>
     route.fulfill({
       status: 401,
-      json: { error: { message: "ignored raw details" } },
+      json: { error: { code: "ACCESS_DENIED", message: "ignored raw details" } },
     }),
   );
   await page.goto("/access");
@@ -117,7 +117,7 @@ test("real unconfigured access routes remain closed", async ({ page }) => {
 
 test("invite code label is stacked above input with visible border and proper button spacing", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto("/access");
   const label = page.getByText("Invite code (required)");
   const input = page.getByLabel("Invite code (required)");
@@ -164,6 +164,6 @@ test("invite code label is stacked above input with visible border and proper bu
 
   // Save screenshot evidence for verification
   await page.screenshot({
-    path: `C:/Users/NeerajK/.gemini/antigravity-ide/brain/76fc060f-7008-47e1-a9e0-f1947f5b1ecc/scratch/access-page-${page.viewportSize()?.width || "unknown"}.png`,
+    path: testInfo.outputPath("access-page.png"),
   });
 });

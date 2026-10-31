@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { navigationForViewport } from "./helpers/navigation";
 
 test("navigation, empty state, and guide work without claiming saved plans", async ({
   page,
@@ -9,16 +10,15 @@ test("navigation, empty state, and guide work without claiming saved plans", asy
     page.getByRole("heading", { name: "Your events" }),
   ).toBeVisible();
   await expect(page.getByText(/No saved events yet/)).toBeVisible();
-  await page.getByRole("link", { name: "Planning guide", exact: true }).click();
+  await (await navigationForViewport(page)).getByRole("link", { name: "Planning guide", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: /A little structure/ }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Planning guide", exact: true }),
+    (await navigationForViewport(page)).getByRole("link", { name: "Planning guide", exact: true }),
   ).toHaveAttribute("aria-current", "page");
-  await page
+  await (await navigationForViewport(page))
     .getByRole("link", { name: "Create an event", exact: true })
-    .first()
     .click();
   await expect(page).toHaveURL(/\/events\/new$/);
 });

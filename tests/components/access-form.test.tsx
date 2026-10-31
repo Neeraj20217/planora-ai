@@ -4,6 +4,35 @@ import userEvent from "@testing-library/user-event";
 import { AccessForm } from "@/components/access-form";
 
 describe("AccessForm UI and Accessibility", () => {
+  it.each([null, { ok: false }, { error: { code: 7 } }])("does not claim access after invalid success JSON: %j", async raw => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(raw));
+    render(<AccessForm />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Start evaluation session" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("invalid access response");
+  });
+  it("does not claim sign-out after a malformed success response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
+    render(<AccessForm />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sign out could not be confirmed: the server returned an invalid response");
+  });
+  it("keeps trial cooldown separate from logout and respects HTTP-date Retry-After", async () => {
+    const now = Date.parse("2026-10-31T00:00:00Z");
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ error: { code: "ACCESS_LIMIT" } }, { status: 429, headers: { "Retry-After": "Sat, 31 Oct 2026 00:02:00 GMT" } }))
+      .mockResolvedValueOnce(Response.json({ ok: true }));
+    render(<AccessForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Start evaluation session" }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Start evaluation session" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("120 seconds");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Signed out");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
   it.each([401, 503])("reports a logout failure (%i) without invite errors or invalidating the invite field", async status => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: { code: "SESSION_REQUIRED", message: "private raw details" } }, { status }));
     render(<AccessForm />);

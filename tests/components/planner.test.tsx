@@ -9,6 +9,48 @@ import { formatINR } from "@/lib/domain/money";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 beforeEach(() => localStorage.clear());
 describe("generation states", () => {
+  it("identifies network failures without retrying or exposing raw transport details", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("private network detail"));
+    render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Check your connection");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("private network detail");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+  it.each([null, { plan: null }])("reports invalid server responses distinctly: %j", async raw => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(raw));
+    const generated = vi.fn();
+    render(<GenerationPanel details={brief} onGenerated={generated} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not be validated");
+    expect(generated).not.toHaveBeenCalled();
+  });
+  it("does not retry generation after malformed trial success", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ error: { code: "SESSION_REQUIRED" } }, { status: 401 }))
+      .mockResolvedValueOnce(Response.json({ ok: false }));
+    render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not be validated");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it("honors a longer Retry-After until the next manual click", async () => {
+    const start = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(start);
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json({ error: { code: "ACCESS_LIMIT" } }, { status: 429, headers: { "Retry-After": "120" } }));
+    render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    await screen.findByRole("alert");
+    clock.mockReturnValue(start + 61000);
+    await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("59 seconds");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    clock.mockReturnValue(start + 121000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
   it("discloses sharing and reports missing configuration while preserving the brief", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -158,7 +200,8 @@ describe("judge access and offline fallback", () => {
       .mockResolvedValueOnce(Response.json({ error: { code: "BOT_DENIED", message: "private server detail" } }, { status: 403 }));
     render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
     await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
-    expect(await screen.findByRole("alert")).not.toHaveTextContent("private server detail");
+    expect(await screen.findByRole("alert")).toHaveTextContent("access check could not verify");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("private server detail");
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("button", { name: "Explore sample plan (offline reference)" })).toBeEnabled();
   });

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, FileText } from "lucide-react";
 import type { EventDetails } from "@/types";
-import { planSchema, type EventPlan } from "@/lib/schemas/plan";
+import type { EventPlan } from "@/lib/schemas/plan";
+import { ApiResponseError, accessResponseSchema, planResponseSchema, fetchApi, readApiResponse, retryAfterMs, cooldownMessage } from "@/lib/api-response";
 import { getSamplePlan } from "@/lib/domain/sample-plans";
 
 class UserPlanningError extends Error {}
@@ -24,7 +25,7 @@ export function GenerationPanel({
     if (pending) return;
     if (Date.now() < retryAt) {
       setError(
-        "Please wait a minute before retrying generation. Your brief is unchanged.",
+        cooldownMessage(retryAt),
       );
       return;
     }
@@ -36,37 +37,46 @@ export function GenerationPanel({
     setPending(true);
     setError("");
     try {
-      let response = await fetch("/api/plans/generate", {
+      let response = await fetchApi("/api/plans/generate", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brief: details }),
         signal,
       });
-      let payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        if (payload?.error?.code === "SESSION_REQUIRED") {
-          const trialRes = await fetch("/api/access/trial", {
+      const applyCooldown = (res: Response) => {
+        const delay = retryAfterMs(res);
+        if (delay > 0) setRetryAt(Date.now() + delay);
+      };
+      applyCooldown(response);
+      let payload = await readApiResponse(response, planResponseSchema);
+      if (!payload.ok) {
+        if (response.status === 401 && payload.error.code === "SESSION_REQUIRED") {
+          const trialRes = await fetchApi("/api/access/trial", {
             method: "POST",
             credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
             body: "{}",
             signal,
           });
-          response = trialRes.ok
-            ? await fetch("/api/plans/generate", {
+          applyCooldown(trialRes);
+          const trial = await readApiResponse(trialRes, accessResponseSchema);
+          if (trial.ok) {
+            response = await fetchApi("/api/plans/generate", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ brief: details }),
                 signal,
-              })
-            : trialRes;
-          payload = await response.json().catch(() => null);
+              });
+            applyCooldown(response);
+            payload = await readApiResponse(response, planResponseSchema);
+          } else {
+            payload = trial;
+          }
         }
       }
-      if (!response.ok) {
-        if (response.status === 429) setRetryAt(Date.now() + 60_000);
+      if (!payload.ok) {
         // Never render arbitrary provider/internal error text.
         const messages: Record<string, string> = {
           NOT_CONFIGURED:
@@ -95,11 +105,11 @@ export function GenerationPanel({
             "The access check could not verify this request. Your brief is unchanged; contact the organizer.",
         };
         throw new UserPlanningError(
-          messages[payload?.error?.code] ??
+          messages[payload.error.code] ??
             "AI planning is unavailable right now. Your brief is unchanged; please try again later.",
         );
       }
-      const plan = planSchema.parse(payload.plan);
+      const plan = payload.data.plan;
       if (JSON.stringify(plan.details) !== JSON.stringify(details))
         throw new UserPlanningError(
           "The response did not match your event details. No plan was saved; please retry.",
@@ -110,6 +120,8 @@ export function GenerationPanel({
       setError(
         signal.aborted
           ? "Generation timed out. Your brief is unchanged; please retry."
+          : issue instanceof ApiResponseError && issue.kind === "network"
+            ? "Could not reach the planning service. Check your connection and try again. Your brief is unchanged."
           : issue instanceof UserPlanningError
             ? issue.message
             : "The response could not be validated. No plan was saved; please retry.",
