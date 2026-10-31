@@ -54,7 +54,7 @@ describe("generation states", () => {
     render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "Generate plan" }));
     expect(screen.getByRole("status")).toHaveTextContent("Generating");
-    expect(screen.getByRole("button")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Planning your celebration…" })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 });
@@ -111,5 +111,55 @@ describe("interactive planning dashboard", () => {
     );
     fireEvent.click(screen.getAllByRole("checkbox")[0]);
     expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
+  });
+});
+
+
+describe("judge access and offline fallback", () => {
+  it("opens a labeled sample without any access or Gemini request", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const generated = vi.fn();
+    render(<GenerationPanel details={brief} onGenerated={generated} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Explore sample plan (offline reference)" }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(generated.mock.calls[0][0].provenance).toBe("test-fixture");
+    expect(generated.mock.calls[0][0].details).toEqual(brief);
+  });
+
+  it("activates one trial for absent access and accepts a strictly valid plan", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ error: { code: "SESSION_REQUIRED" } }, { status: 401 }))
+      .mockResolvedValueOnce(Response.json({ ok: true }))
+      .mockResolvedValueOnce(Response.json({ plan: fixturePlan() }));
+    const generated = vi.fn();
+    render(<GenerationPanel details={brief} onGenerated={generated} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+    await waitFor(() => expect(generated).toHaveBeenCalledOnce());
+    expect(fetchMock.mock.calls.map(call => call[0])).toEqual(["/api/plans/generate", "/api/access/trial", "/api/plans/generate"]);
+  });
+
+  it("uses the retried response status and blocks immediate retries after a quota rejection", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ error: { code: "SESSION_REQUIRED" } }, { status: 401 }))
+      .mockResolvedValueOnce(Response.json({ ok: true }))
+      .mockResolvedValueOnce(Response.json({ error: { code: "ACCESS_LIMIT" } }, { status: 429 }));
+    render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("allowance");
+    await user.click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("wait a minute");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not display arbitrary trial server text or generate after trial rejection", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ error: { code: "SESSION_REQUIRED" } }, { status: 401 }))
+      .mockResolvedValueOnce(Response.json({ error: { code: "BOT_DENIED", message: "private server detail" } }, { status: 403 }));
+    render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(await screen.findByRole("alert")).not.toHaveTextContent("private server detail");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "Explore sample plan (offline reference)" })).toBeEnabled();
   });
 });

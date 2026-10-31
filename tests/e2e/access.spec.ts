@@ -1,6 +1,44 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("logout failures never blame an invite or claim successful revocation", async ({ page }) => {
+  await page.route("**/api/access/logout", route => route.fulfill({
+    status: 503, json: { error: { code: "ACCESS_UNAVAILABLE", message: "private raw detail" } },
+  }));
+  await page.goto("/access");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  const alert = page.getByRole("main").getByRole("alert");
+  await expect(alert).toContainText("Sign out could not be confirmed");
+  await expect(alert).not.toContainText(/invite|private raw detail/i);
+  await expect(page.getByLabel("Invite code (required)")).not.toHaveAttribute("aria-invalid");
+});
+
+test("trial access and direct offline samples need no invitation or Gemini request", async ({ page }) => {
+  let generations = 0;
+  await page.route("**/api/plans/generate", route => {
+    generations++;
+    return route.fulfill({ status: 503, json: { error: { code: "ACCESS_UNAVAILABLE" } } });
+  });
+  await page.route("**/api/access/trial", route => {
+    expect(route.request().postDataJSON()).toEqual({});
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto("/access");
+  await page.getByRole("button", { name: "Start evaluation session" }).click();
+  await expect(page.getByRole("status")).toContainText("Evaluation access granted");
+  await page.goto("/events/new");
+  for (const [label, value] of [["Event name", "Judge offline evaluation"], ["Event date", "2099-11-01"], ["Location", "Hyderabad"], ["Number of guests", "50"], ["Total budget (INR)", "30000"]])
+    await page.getByLabel(label, { exact: true }).fill(value);
+  await page.getByRole("button", { name: "Review event details" }).click();
+  await page.getByRole("button", { name: "Explore sample plan (offline reference)" }).click();
+  await expect(page.getByTestId("sample-plan-banner")).toBeVisible();
+  await page.getByRole("button", { name: "Save plan", exact: true }).click();
+  await page.waitForURL(/\/events\/[a-f0-9-]+$/);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Judge offline evaluation", exact: true })).toBeVisible();
+  expect(generations).toBe(0);
+});
+
 test("invite access is accessible, clears codes and supports logout without browser storage", async ({
   page,
 }) => {

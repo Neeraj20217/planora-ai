@@ -36,7 +36,7 @@ export function GenerationPanel({
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/plans/generate", {
+      let response = await fetch("/api/plans/generate", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
@@ -46,42 +46,26 @@ export function GenerationPanel({
       let payload = await response.json().catch(() => null);
       if (!response.ok) {
         if (payload?.error?.code === "SESSION_REQUIRED") {
-          try {
-            const trialRes = await fetch("/api/access/trial", {
-              method: "POST",
-              credentials: "same-origin",
-              headers: { "Content-Type": "application/json" },
-              body: "{}",
-              signal,
-            });
-            if (trialRes.ok) {
-              const retryRes = await fetch("/api/plans/generate", {
+          const trialRes = await fetch("/api/access/trial", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+            signal,
+          });
+          response = trialRes.ok
+            ? await fetch("/api/plans/generate", {
                 method: "POST",
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ brief: details }),
                 signal,
-              });
-              payload = await retryRes.json().catch(() => null);
-              if (retryRes.ok) {
-                const plan = planSchema.parse(payload.plan);
-                if (JSON.stringify(plan.details) !== JSON.stringify(details))
-                  throw new UserPlanningError(
-                    "The response did not match your event details. No plan was saved; please retry.",
-                  );
-                onGenerated(plan);
-                return;
-              }
-            } else {
-              const trialData = await trialRes.json().catch(() => null);
-              if (trialData?.error?.message) {
-                throw new UserPlanningError(trialData.error.message);
-              }
-            }
-          } catch (trialErr) {
-            if (trialErr instanceof UserPlanningError) throw trialErr;
-          }
+              })
+            : trialRes;
+          payload = await response.json().catch(() => null);
         }
+      }
+      if (!response.ok) {
         if (response.status === 429) setRetryAt(Date.now() + 60_000);
         // Never render arbitrary provider/internal error text.
         const messages: Record<string, string> = {
@@ -163,15 +147,13 @@ export function GenerationPanel({
           Keep this page open.
         </p>
       ) : null}
-      {error ? (
-        <div className="generation-fallback">
-          <p className="error-summary" role="alert">
-            {error}
-          </p>
+      <div className="generation-fallback">
+          {error ? <p className="error-summary" role="alert">{error}</p> : null}
           <div style={{ marginTop: "12px" }}>
             <button
               type="button"
               className="button button-secondary"
+              disabled={pending}
               onClick={() => onGenerated(getSamplePlan(details.eventType, details))}
             >
               <FileText aria-hidden="true" size={18} />
@@ -179,7 +161,6 @@ export function GenerationPanel({
             </button>
           </div>
         </div>
-      ) : null}
     </section>
   );
 }

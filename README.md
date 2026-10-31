@@ -1,277 +1,112 @@
 # Planora AI
 
-**GenAI Celebration & Event Planning Workspace**  
-*PromptWars Virtual 2026 — Main Challenge 05*
+**PromptWars Virtual 2026 — Main Challenge 05: Celebration & Event Planner**
 
-[![Live Website](https://img.shields.io/badge/Live%20Website-planora--ai--iota.vercel.app-blue?style=flat-square)](https://planora-ai-iota.vercel.app)
-[![Node.js](https://img.shields.io/badge/Node.js-24.x%20LTS-green?style=flat-square)](https://nodejs.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-16.4.3-black?style=flat-square)](https://nextjs.org/)
-[![Model](https://img.shields.io/badge/Google%20Gemini-3.5%20Flash--Lite-orange?style=flat-square)](https://ai.google.dev/)
-[![Tests](https://img.shields.io/badge/Tests-222%20Passed-brightgreen?style=flat-square)](https://github.com/Neeraj20217/planora-ai)
+A planning workspace for weddings, birthdays and community events in India. Gemini proposes contextual ideas and priorities; deterministic application code validates the proposal and composes exact INR allocations, preparation dates and vendor checklists.
 
----
+- [Public application](https://planora-ai-iota.vercel.app)
+- [Generation access](https://planora-ai-iota.vercel.app/access)
+- [Planning guide](https://planora-ai-iota.vercel.app/guide)
+- [Public repository](https://github.com/Neeraj20217/planora-ai)
+- Competition deadline supplied by the organizer: November 1, 2026, 11:59 PM IST.
 
-## 1. Challenge & Problem Statement
+## Evaluate the application
 
-**Target Challenge:** PromptWars Virtual 2026 — Main Challenge 05: Celebration & Event Planner  
-**Submission Deadline:** November 1, 2026, 11:59 PM IST  
-**Official Problem Statement:**
-> *"Create a GenAI-powered planning assistant that helps users organize weddings, birthdays, and community events with budgets, timelines, vendor checklists, and personalized ideas."*
+### Offline reference path — no invitation or AI request required
 
-### Purpose and Philosophy
-Organizing celebrations in India often involves managing fragmented spreadsheets, unpredictable vendor communication, and shifting guest expectations. **Planora AI** turns this chaos into structured clarity. Users enter basic event details—guest count, date, location, budget in INR, theme, and dietary/cultural preferences—and receive an actionable planning blueprint within seconds.
+1. Open **Create an event**. Choose Wedding, Birthday or Community event.
+2. Enter an event name, today or a future date, location, guests and INR budget. Theme, preferences and requirements are optional.
+3. Select **Review event details**, then **Explore sample plan (offline reference)**. There is no need to select Generate plan first.
+4. Inspect the exact allocation total, contingency, timeline dependencies and vendor checklist. Samples are explicitly labeled as offline references; their generic recommendations are not personalized AI output.
+5. Toggle tasks, change vendor statuses and select **Save plan**. Refresh, or reopen the event from **My events**, to check persistence.
 
-Planora AI establishes a strict architectural boundary: **GenAI proposes creative strategy, personalized priorities, and tailored vendor roles, while deterministic application code enforces exact mathematical allocations, calendar schedules, and input validation.**
+### Live generation path — subject to access and shared quotas
 
----
+1. In a normal browser on the canonical site, open **Generation access** and select **Start evaluation session**. No invite code is required for an eligible trial.
+2. A successful claim creates an expiring session cookie, valid for up to eight hours. Each public session permits at most **two admitted generation requests across its entire lifetime**, including across UTC midnight. Failed admitted requests still consume that allowance.
+3. Only one public trial can be claimed per trusted client IP hash per UTC day. Shared networks can therefore affect eligibility. Private single-use organizer invitations are a separate access option.
+4. Create and review an event, then select **Generate plan**. An absent or expired session triggers one automatic trial-activation attempt; successful activation retries generation once. No quotas are reset.
+5. Save the resulting plan explicitly. Sign out revokes a valid session; signing out neither refunds nor resets allowances. If sign-out cannot be confirmed, the interface says so.
+6. If access checks, configuration, provider availability or quotas prevent generation, follow the error guidance or use the offline reference path.
 
-## 2. Public Live Website
+Live generation depends on operator configuration, BotID verification, Redis availability and remaining provider quota. This README does not guarantee that live access is enabled or available for every visitor. This audit used mocks only; it does not re-certify live Gemini or platform security behavior.
 
-- **Production URL:** [https://planora-ai-iota.vercel.app](https://planora-ai-iota.vercel.app)
-- **Repository:** [https://github.com/Neeraj20217/planora-ai](https://github.com/Neeraj20217/planora-ai)
-- **Access Page:** [https://planora-ai-iota.vercel.app/access](https://planora-ai-iota.vercel.app/access)
-- **Guide & Documentation:** [https://planora-ai-iota.vercel.app/guide](https://planora-ai-iota.vercel.app/guide)
+## Approach and contextual AI logic
 
----
+The brief includes event type, date, location, guests, INR budget, theme, preferences and special requirements. The server supplies the planning date in Asia/Kolkata and derives:
 
-## 3. Features Across Event Types
+- Whole-paise budget per guest and its remainder. Below INR 500 per guest triggers a limited-funds warning, not a market-price claim.
+- Preparation urgency: same-day, urgent (up to 7 days), soon (up to 30 days), or advance.
+- Large-gathering warnings at 200 or more guests, plus zero-budget and short-notice warnings.
 
-Planora AI supports the three mandatory event verticals defined in Challenge 05:
+Gemini receives these inputs and is instructed to explain recommendations, expose assumptions, account for constraints, and avoid claiming verified vendor availability or inferring cultural preferences from location. User-supplied text is untrusted data. Suggestions are validated against strict Zod contracts, including unique categories and acyclic task dependencies. Model output is not guaranteed to be valid or factually correct; invalid output is rejected after bounded repair/retry attempts.
 
-| Event Vertical | Key Planning Dimensions | Specialized AI Outputs |
-| :--- | :--- | :--- |
-| **Weddings** | Multi-day ceremony sequencing, family coordination, reception & catering logistics | High-touch vendor categories (Venue, Catering, Photography/Cinematography, Decor, Attire/Styling, Makeup, Sound/Mehendi); milestone dependencies; cultural traditions. |
-| **Birthdays** | Milestone celebrations, themed parties, age-tailored entertainment, pacing | Experiential activities, theme cake design, entertainer/magician booking, photo booths, return gift pacing, and party timelines. |
-| **Community Events** | Cultural festivals, neighbourhood gatherings, fundraisers, sports meets | High-volume logistical checklists (Audiovisual/Stage, Crowd Management & Permits, Sanitation/Waste, First Aid, Volunteer Coordination) and public engagement concepts. |
+The provider-facing JSON Schema is separate from strict application validation. The server-only Google GenAI SDK uses the configured GEMINI_MODEL; the previously verified model was gemini-3.5-flash-lite. There is no automatic model switch. SDK attempts are limited to one per invocation; generation permits at most two total provider invocations, sharing a 38-second pipeline deadline and a 30-second SDK timeout. The browser allows 50 seconds; the generation route has a 45-second maximum duration. No fixed response time is promised.
 
-### Core Workflow Features
-- **Accessible Multi-Step Form**: Fully keyboard-navigable form with screen-reader live regions, real-time validation, and currency formatting.
-- **Review Before Generation**: Transparent data review disclosing exactly what brief data will be sent to Google Gemini before network transmission.
-- **Deterministic Budget Breakdown**: Integer-paise mathematics with an automatic 10% contingency fund and largest-remainder category allocation.
-- **Dependency-Aware Interactive Timeline**: Milestone scheduling with completion tracking, progress indicators, and overdue warnings.
-- **Interactive Vendor Checklist**: Essential vs. optional vendor identification with editable engagement statuses (`researching`, `contacted`, `booked`).
-- **Personalized Ideas & Trade-Offs**: Creative theme concepts, entertainment ideas, and actionable cost-saving tips tailored to event scale.
-- **Offline Persistence & Zero Lock-In**: Client-side versioned `localStorage` (`planora:plan:v1:<uuid>`) with in-browser save and reopen, stale-write detection, and zero attendee tracking.
-- **Offline Reference Fallback**: Pre-computed canonical sample plans accessible for all three verticals when quotas or operator kill switches are active.
+## What the application implements
 
----
+- Accessible event form with validation on review/submission, review/edit flow and explicit sharing notice.
+- Celebration Atelier homepage, responsive navigation, saved-event cards and planning dashboard.
+- Budget allocation bars with exact INR values, rounded display percentages and an explicit distinction between planned allocation and actual spending. Actual expenses are not tracked.
+- Dependency-aware preparation timeline with editable completion, priorities, overdue labels and progress.
+- Vendor/service categories: venue, catering, decoration, photography, entertainment, transport, equipment and logistics. Entries are categories, not verified businesses.
+- Vendor statuses: not-started, shortlisted, contacted, booked, not-needed; Essential and Optional describe arrangements, not obligations to hire.
+- Contextual ideas, recommendations, savings, warnings and assumptions.
+- Explicit browser-only save/reopen with revision checks and stale-write detection. No cloud synchronization.
+- Offline reference proposals for all three event types, composed with the supplied event details using the same domain logic.
 
-## 4. Architecture & Gemini Integration
+## Budget and timeline logic
 
-```text
-[ Browser Client ]
-  │
-  ├── 1. Form Validation (Zod schema, keyboard focus, currency parsing)
-  ├── 2. User Review & Explicit Sharing Notice
-  └── 3. POST /api/plans/generate (with BotID telemetry & session cookie)
-        │
-[ Vercel Edge / Serverless (iad1) ]
-  │
-  ├── 4. Security Boundary (Exact-Origin, Host, Content-Type, Size <= 32 KiB)
-  ├── 5. BotID Basic Verification (Edge humanity check, rejects headless bots)
-  ├── 6. Upstash Redis (Atomic Primary Lua Scripts)
-  │     ├── Check operator kill switch (generation-state == 'enabled')
-  │     ├── Enforce IP burst rate (3 req/min)
-  │     ├── Enforce session / trial quota (2 generations/day per IP)
-  │     ├── Enforce global daily cap (40 provider attempts/day across site)
-  │     └── Acquire concurrency lease (max 2 active leases)
-  │
-  ├── 7. Google Gemini 3.5 Flash-Lite (@google/genai SDK v2.31.0)
-  │     ├── Temperature: 0.2 (deterministic output)
-  │     ├── Structured Output Schema (Zod -> JSON Schema)
-  │     └── Strict 30s call timeout / 38s overall pipeline deadline
-  │
-  ├── 8. Deterministic Domain Composition
-  │     ├── Integer-paise budget allocation (Contingency + Largest Remainder)
-  │     └── Topological timeline sorting (Prerequisites strictly precede tasks)
-  │
-  └── 9. Response -> Client Dashboard -> Explicit Save -> LocalStorage
-```
+Money is parsed and stored in integer paise. Contingency is floor(totalPaise / 10): a 10% target rounded down to the nearest paise. Remaining funds are distributed by relative category weights using largest remainders and deterministic tie-breaking. Allocations, including contingency, sum exactly to the input budget. Display percentages are rounded to two decimals and may not sum to exactly 100%; they do not drive money calculations. Zero-budget plans remain valid.
 
-### Server-Only Secret Protection
-- **No Client Exposure**: The Gemini API key and Redis credentials reside exclusively in serverless environment variables. `import "server-only"` prevents accidental frontend bundling.
-- **Fail-Closed Design**: Any configuration absence, quota exhaustion, or invalid token aborts the request before provider invocation ($0.00 cost leakage).
+Core templates and AI tasks form a dependency graph. Scheduling respects calendar dates from the planning snapshot to the event. On compressed or same-day schedules, prerequisite and dependent tasks may share a date; they must still follow dependency order. Dates and warnings do not guarantee feasible bookings or sufficient preparation time.
 
----
+## Security and privacy boundaries
 
-## 5. How AI Makes Contextual Decisions
+- Exact origin/host and cross-site checks, content-type validation, a 32 KiB request limit and bounded body-read time.
+- Hosted access requires release flags, complete configuration, server-side BotID verification, a valid session, and atomic Redis admission. Redis errors fail closed.
+- Secure, HttpOnly, SameSite=Strict host-only session cookies; Redis stores hashed invite/session identifiers with expiration. Valid session revocation must succeed before logout reports success. No-session logout is idempotent after the same request boundary checks.
+- Public trial lifetime allowance: two admitted requests. Private invitations: five admissions per UTC day. Admission IP limit: three requests per minute; global provider cap: 40 attempts per UTC day; concurrency: two expiring ownership leases. Retries/repairs consume provider-attempt allowance.
+- Redis generation-state switch and environment gates control admission. They do not recall provider calls already in flight.
+- CSP frame-ancestors 'none' and X-Frame-Options DENY block framing. External WAF/BotID effectiveness and trusted edge-header handling require platform verification; code and mocked tests are not an independent security audit.
+- API keys remain server-side. Reviewed briefs travel to the application server and Gemini when live generation is requested. Saved plans remain in this browser and site origin; clearing storage, private browsing or switching devices/origins can remove access. Do not enter sensitive guest information.
 
-Planora AI does not treat the LLM as an unconstrained text generator. Instead, the prompt orchestrator injects derived metadata into the context:
+## Assumptions and limitations
 
-1. **Budget Pressure Index**:
-   Calculates budget per guest in INR ($\text{Total Budget} / \text{Guests}$) and categorizes the event into budget tiers (Economy, Balanced, Premium, Luxury). Gemini uses this to decide whether to recommend full-service banquets or curated DIY/community arrangements.
-2. **Timeline Urgency Metric**:
-   Computes the calendar days between today (evaluated strictly in `Asia/Kolkata` time) and the event date. Urgency tiers (Urgent $< 14\text{ days}$, Compressed $< 45\text{ days}$, Standard $> 90\text{ days}$) determine timeline pacing and fast-track vendor lead times.
-3. **Guest Scale Heuristics**:
-   Differentiates intimate gatherings ($< 25\text{ guests}$), standard events ($25\text{--}150\text{ guests}$), and large-scale crowds ($150\text{--}10,000\text{ guests}$), adjusting crowd management, venue requirements, and catering ratios accordingly.
-4. **Feasibility Warnings**:
-   When a user requests an unrealistic combination (e.g., 500 guests on a ₹20,000 budget), Gemini generates explicit feasibility warnings and trade-off advice rather than hallucinating unattainable supplier rates.
+Recommendations, availability, prices, weather, capacity, local permissions and cultural suitability require human confirmation. There are no bookings, payments, vendor-directory lookups or verified quotes. Reference samples are generic demonstrations. Live AI can be unavailable or time out; shared-IP limits can block otherwise legitimate visitors. Infrastructure/provider quotas and charges depend on the accounts and plans in use; no zero-cost or latency guarantee is made.
 
----
+## Run locally
 
-## 6. Budget & Timeline Calculation Logic
+Requires Node.js 24.x and npm 11.x.
 
-### Exact Money Arithmetic (Integer Paise)
-Floating-point arithmetic is banned in Planora AI financial calculations to avoid rounding discrepancies:
-1. **Input Parsing**: Currency inputs are validated and converted into integer paise ($1\text{ INR} = 100\text{ paise}$).
-2. **Contingency Partition**: Exactly $10\%$ is reserved for unexpected expenses:
-   $$\text{ContingencyPaise} = \left\lfloor \frac{\text{TotalPaise}}{10} \right\rfloor$$
-3. **Largest-Remainder Allocation (Hare-Niemeyer)**:
-   The remaining $90\%$ of funds are distributed across vendor categories using relative weights provided by Gemini:
-   $$\text{CategoryPaise}_i = \left\lfloor \text{DistributablePaise} \times \frac{\text{Weight}_i}{\sum \text{Weights}} \right\rfloor$$
-   Fractional remainders are sorted descending, with category names providing deterministic tie-breaking, distributing single-paise increments until the exact total is reached.
-4. **Invariant**: $\sum \text{CategoryPaise} + \text{ContingencyPaise} \equiv \text{TotalPaise}$.
-
-### Topological Timeline Scheduling
-1. **Planning Horizon**: Dates are date-only calendar values bound to `Asia/Kolkata` calendar days.
-2. **Prerequisite Graph**: Core task templates and AI-generated milestones are topologically sorted. Prerequisite tasks (e.g., "Confirm Venue & Date") are mathematically guaranteed to precede dependent tasks (e.g., "Send Invitations" or "Finalize Decor").
-3. **Past-Date Clamping**: In compressed timelines, tasks are clamped between today and the event date with warnings highlighting urgent actions.
-
----
-
-## 7. Setup & Running Locally
-
-### Prerequisites
-- Node.js **24.x LTS** (`node -v` $\ge 24.0.0$)
-- npm **11.x**
-
-### Quickstart
 ```bash
-# Clone the public repository
-git clone https://github.com/Neeraj20217/planora-ai.git
-cd planora-ai
-
-# Install dependencies cleanly
 npm ci
-
-# Configure local development environment
-cp .env.example .env.local
-```
-
-### Configure Local Gemini API
-Edit `.env.local` to enable loopback development:
-```env
-GEMINI_API_KEY="your-google-gemini-api-key"
-GEMINI_MODEL="gemini-3.5-flash-lite"
-AI_ENABLE_LOCAL_GENERATION="true"
-```
-*(Note: Never commit `.env.local`. Hosted generation remains disabled locally).*
-
-### Verify Model Access & Start
-```bash
-# Check Gemini model availability (does not expose key)
-npm run ai:models
-
-# Start local development server
 npm run dev
 ```
-Visit [http://localhost:3000](http://localhost:3000) to create and test events.
 
----
+Open http://localhost:3000. Offline references require no Gemini key. To opt into local live generation, copy .env.example to .env.local and configure GEMINI_API_KEY, GEMINI_MODEL and AI_ENABLE_LOCAL_GENERATION=true privately. Never commit local environment files. The optional npm run ai:models command makes a real model-discovery request. Hosted setup and release controls are documented in docs/HOSTED_SECURITY.md and the phase reports; do not disable safeguards to make tests pass.
 
-## 8. Security, Limitations & Assumptions
+## Validation
 
-### Security Controls
-- **Exact-Origin & Anti-CSRF**: Hosted API endpoints reject requests with mismatched `Origin`, external `Host`, or cross-site `Sec-Fetch-Site`.
-- **BotID Verification**: Production endpoints require client challenge verification from `@vercel/botid` (`botid/client/core` and `botid/server`). Direct automated curls or headless scrapers are rejected with HTTP 403 `BOT_DENIED`.
-- **Multi-Tier Redis Quotas**: Upstash Redis executes atomic Lua scripts on every admission:
-  - 3 requests per minute per IP hash.
-  - 2 admitted generation plans per evaluation session.
-  - 40 global provider attempts per UTC day hard cap ($< 8\%$ of free tier).
-  - Maximum 2 concurrent execution leases.
-- **Kill Switch**: Atomic Redis key (`generation-state`) can halt hosted generation across all serverless lambdas instantly without redeploying.
-- **Client Privacy**: Event briefs are stored exclusively in client-side `localStorage`. No user credentials, personal phone numbers, or emails are persisted on servers.
-
-### Current Limitations & Assumptions
-- **Vendor Marketplace**: Vendor entries represent category specifications and budget allocations, not guaranteed live commercial contracts or directory listings.
-- **Free-Tier Boundaries**: Built strictly on Google Gemini free-tier quotas and free Vercel/Upstash infrastructure ($0.00 operational cost).
-- **Single-Region Serverless**: Serverless lambdas operate in `iad1` (East US). Initial cold-start latency from transatlantic locations is ~3–5 seconds; subsequent warm requests complete in ~1–3 seconds.
-
----
-
-## 9. Testing & Verification Results
-
-### Automated Test Suites
-Planora AI maintains exhaustive automated test coverage:
 ```bash
-# Run unit, domain, component, and integration suites
 npm test
-
-# Run TypeScript type safety verification
 npm run typecheck
-
-# Run linter
 npm run lint
-
-# Run production build
 npm run build
+npm run test:e2e
 ```
 
-**Results:**
-- **13 Test Files Passed** (100%)
-- **222 Automated Tests Passed** (0 failures)
-- TypeScript strict typecheck: 0 errors.
-- ESLint: 0 warnings, 0 errors.
-- Production build: Compiled cleanly with static & dynamic routes.
+Pre-submission audit on **October 31, 2026**: **240 automated tests in 14 files passed**, including logout, access, retry and offline-reference regressions. **12 focused desktop/mobile browser checks passed** for access, safe errors, direct offline samples, mocked generation, task/vendor editing and save/refresh/reopen. TypeScript, ESLint and the production build passed. Automated providers are mocked; no live Gemini request is needed. Browser tests use synthetic data and mocked responses where applicable. Historical live generation and isolated Redis results are documented separately and are not rerun or represented as new live results here.
 
-### Live Production Verification
-- **Test Date:** October 30, 2026.
-- **Model:** Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`).
-- **Live Tested Events:**
-  1. **Wedding Celebration**: ₹800,000 budget, 250 guests, Hyderabad, floral theme with vegetarian catering and accessibility needs. Generated in **7 seconds**. Exact ₹800,000 allocation across 7 categories including ₹80,000 (10%) contingency, 10 timeline tasks, 4 vendor categories, personalized lounge/decor ideas, and browser persistence verified on production.
-  2. **Birthday Celebration**: ₹30,000 budget, 25 guests, Hyderabad. Exact ₹30,000 allocation across 5 categories plus contingency, 9 timeline tasks, vendor checklist, and browser persistence verified on production.
-- **Event Scope Note:** Live hosted generation was verified on production for **Wedding** and **Birthday** verticals; **Community** planning models and schemas are verified via automated component and integration test suites and offline reference fixtures.
+## Repository layout
 
----
+- src/app: public pages and API route handlers.
+- src/components: event forms, access UI, saved cards and planning dashboard.
+- src/lib/ai: prompt, provider adapter and response schema.
+- src/lib/domain: exact money, calendar, context and plan composition.
+- src/lib/server/hosted: access boundaries, Redis Lua admission and sessions.
+- src/lib/storage and src/lib/schemas: versioned browser persistence and strict contracts.
+- tests: unit, component, integration/security and browser checks.
+- docs: architecture, verification evidence, release and security limitations.
 
-## 10. Judge Evaluation Instructions
-
-Competition judges can evaluate Planora AI using either of two supported paths:
-
-### Option A: Live Gemini Generation (Interactive Trial)
-1. Open the production website: **[https://planora-ai-iota.vercel.app](https://planora-ai-iota.vercel.app)**
-2. Navigate to the **[Generation Access](https://planora-ai-iota.vercel.app/access)** page.
-3. Click **"Start evaluation session"**.
-   - *This grants an instant, code-free 8-hour trial session (allowing up to 2 live Gemini generations per connection).*
-4. Navigate to **"Create an event"** (`/events/new`).
-5. Choose an event type (**Birthday**, **Wedding**, or **Community Event**), fill in details, and click **"Review event details"**.
-6. Click **"Generate plan"**. Gemini 3.5 Flash-Lite will synthesize your custom plan.
-7. Interact with timeline checkboxes, adjust vendor statuses, and click **"Save plan"**. Refresh or return to "My events" to verify persistent local storage.
-
-### Option B: Offline Reference Mode (Guaranteed Access)
-If the shared daily evaluation quota is reached or hosted generation is closed:
-1. Navigate to **"Create an event"** (`/events/new`).
-2. Fill in event details and click **"Review event details"**.
-3. Click **"Explore sample plan (offline reference)"**.
-4. The application renders full, pre-computed canonical plans for Weddings, Birthdays, or Community events with honest provenance labeling (`Offline Reference Sample`), allowing full evaluation of UI, budget math, timelines, and vendor checklists.
-
----
-
-## 11. Project Repository Structure
-
-```text
-planora-ai/
-├── src/
-│   ├── app/                      # Next.js App Router routes (/, /access, /guide, /events)
-│   │   └── api/                  # Serverless API routes (/api/plans/generate, /api/access)
-│   ├── components/               # React UI components
-│   │   ├── events/               # Accessible event forms and dashboard views
-│   │   ├── planner/              # Plan dashboard, timeline, budget, vendor checklist
-│   │   └── ui/                   # Reusable accessible inputs and alerts
-│   ├── lib/
-│   │   ├── ai/                   # Gemini SDK adapter, prompts, and JSON schema
-│   │   ├── domain/               # Integer-paise budget math, dates, context heuristics
-│   │   ├── schemas/              # Zod contracts for briefs, proposals, and plans
-│   │   ├── server/               # Server-only boundary guards, rate limiters, errors
-│   │   │   └── hosted/           # Upstash Redis atomic Lua scripts, BotID runtime
-│   │   └── storage/              # Versioned localStorage repository & hooks
-│   └── types/                    # TypeScript interfaces
-├── tests/                        # Vitest unit, component, integration, and security suites
-├── docs/                         # Architecture documentation and release runbooks
-├── scripts/                      # Credential-safe admin and discovery scripts
-└── README.md                     # Competition submission documentation
-```
-
----
-
-*Built for PromptWars Virtual 2026 — Main Challenge 05. Powered by Google Gemini.*
+Built for PromptWars Virtual 2026, Main Challenge 05.

@@ -617,3 +617,37 @@ describe("public evaluation trial security and quota enforcement", () => {
     expect(res.status).toBe(503);
   });
 });
+
+
+describe("idempotent logout preserves revocation boundaries", () => {
+  it.each(["", COOKIE + "=malformed"])("clears absent or malformed cookies without a provider call: %s", async cookie => {
+    const h = await harness();
+    const result = await accessHandler(() => h.security, "logout")(request({ cookie }, {}));
+    expect(result.status).toBe(200);
+    expect(result.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect(result.headers.get("set-cookie")).toContain("HttpOnly");
+    expect(h.provider).not.toHaveBeenCalled();
+  });
+  it("treats expired sessions idempotently and rejects subsequent generation", async () => {
+    const h = await harness();
+    h.redis.advance(28801);
+    expect((await accessHandler(() => h.security, "logout")(request({}, {}))).status).toBe(200);
+    expect((await h.handler()(request())).status).toBe(401);
+    expect(h.provider).not.toHaveBeenCalled();
+  });
+  it("does not report successful revocation on Redis failure", async () => {
+    const h = await harness();
+    h.command.mockRejectedValue(new Error("simulated outage"));
+    const result = await accessHandler(() => h.security, "logout")(request({}, {}));
+    expect(result.status).toBe(503);
+    expect(result.headers.get("set-cookie")).toBeNull();
+    expect(h.provider).not.toHaveBeenCalled();
+  });
+  it("still rejects cross-origin logout even without a session", async () => {
+    const h = await harness();
+    const result = await accessHandler(() => h.security, "logout")(request({ cookie: "", origin: "https://evil.example" }, {}));
+    expect(result.status).toBe(403);
+    expect(result.headers.get("set-cookie")).toBeNull();
+    expect(h.provider).not.toHaveBeenCalled();
+  });
+});

@@ -4,6 +4,30 @@ import userEvent from "@testing-library/user-event";
 import { AccessForm } from "@/components/access-form";
 
 describe("AccessForm UI and Accessibility", () => {
+  it.each([401, 503])("reports a logout failure (%i) without invite errors or invalidating the invite field", async status => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: { code: "SESSION_REQUIRED", message: "private raw details" } }, { status }));
+    render(<AccessForm />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Sign out" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Sign out could not be confirmed");
+    expect(alert).not.toHaveTextContent(/invite|private raw details/i);
+    expect(screen.getByLabelText("Invite code (required)")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("reports network logout failures without claiming successful revocation", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("private transport detail"));
+    render(<AccessForm />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("may still have an active session");
+  });
+
+  it("distinguishes disabled trial access from quota exhaustion", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: { code: "ACCESS_UNAVAILABLE" } }, { status: 503 }));
+    render(<AccessForm />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Start evaluation session" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("unavailable or disabled");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("limit reached");
+  });
   it("renders accessible label positioned above the input with field container styling", () => {
     render(<AccessForm />);
 

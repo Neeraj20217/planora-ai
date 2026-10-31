@@ -9,14 +9,16 @@ export function AccessForm() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
+  const [errorAction, setErrorAction] = useState<string | null>(null);
   useEffect(() => {
-    if (error && !busy) input.current?.focus();
-  }, [error, busy]);
+    if (error && !busy && errorAction === "redeem") input.current?.focus();
+  }, [error, busy, errorAction]);
   async function submit(action: "redeem" | "logout" | "trial") {
     if (busy) return;
     setBusy(true);
     setMessage("");
     setError(false);
+    setErrorAction(action);
     const code = input.current?.value ?? "";
     // Keep the code out of component state and clear it on every attempt.
     if (input.current) input.current.value = "";
@@ -29,26 +31,38 @@ export function AccessForm() {
         body: JSON.stringify(action === "redeem" ? { code } : {}),
         signal: AbortSignal.timeout(10_000),
       });
-      if (!response.ok)
-        throw new Error(
-          action === "trial"
-            ? "Evaluation access limit reached for your connection (2 plans/day), or the service cap was reached. Enter an organizer invite code to continue."
-            : "Access could not be completed. Your invite may be invalid, expired or already used, a limit may have been reached, or hosted access may be disabled. Ask the organizer before retrying.",
-        );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const code = payload?.error?.code;
+        const unavailable = code === "ACCESS_UNAVAILABLE" || response.status >= 500;
+        const denied = code === "BOT_DENIED" || code === "ORIGIN" || code === "CLIENT_IP";
+        const message = action === "logout"
+          ? "Sign out could not be confirmed. Please try again when secure access is available. This browser may still have an active session."
+          : unavailable
+            ? "Secure generation access is currently unavailable or disabled. Try later, or create an event and explore an offline reference plan."
+            : denied
+              ? "The access check could not verify this browser request. Use the official site in a normal browser, or contact the organizer."
+              : response.status === 429
+                ? "The evaluation, invite, or service limit has been reached. Wait before retrying or contact the organizer. Signing out does not reset allowances."
+                : action === "trial"
+                  ? "Evaluation access could not be started. Try later or contact the organizer. Offline reference plans remain available."
+                  : "Access could not be completed. Your invite may be invalid, expired or already used. Check it with the organizer.";
+        setError(true);
+        setMessage(message);
+        return;
+      }
       setMessage(
         action === "redeem"
           ? "Generation access granted for this browser until the session expires. You can create an event now."
           : action === "trial"
-            ? "Evaluation access granted (2 live generations remaining). You can create an event now."
+            ? "Evaluation access granted: up to 2 generation requests during this 8-hour session. You can create an event now."
             : "Signed out. This session can no longer generate plans.",
       );
-    } catch (failure) {
+    } catch {
       setError(true);
-      setMessage(
-        failure instanceof Error && (failure.message.startsWith("Access could") || failure.message.startsWith("Evaluation access"))
-          ? failure.message
-          : "Access could not be completed. Please try later.",
-      );
+      setMessage(action === "logout"
+        ? "Sign out could not be confirmed because the request failed or timed out. Please retry; this browser may still have an active session."
+        : "Access could not be completed because the request failed or timed out. Please try later; offline reference plans remain available.");
     } finally {
       setBusy(false);
     }
@@ -83,12 +97,12 @@ export function AccessForm() {
             autoComplete="off"
             spellCheck={false}
             aria-describedby="invite-help access-message"
-            aria-invalid={error || undefined}
+            aria-invalid={(error && errorAction === "redeem") || undefined}
             disabled={busy}
           />
           <p id="invite-help" className="field-hint access-help">
             Do not share this code. Enter an organizer invite for extended access,
-            or click Start evaluation session below for an instant trial (2 live generations).
+            or click Start evaluation session below for an 8-hour trial (up to 2 generation requests).
           </p>
         </div>
         <div className="access-actions">

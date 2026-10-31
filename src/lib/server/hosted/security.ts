@@ -203,7 +203,17 @@ export function createHostedSecurity(
     },
     async logout(request: Request) {
       boundary(request);
-      const key = config.prefix + "session:" + sessionHash(request);
+      let hash: string;
+      try {
+        hash = sessionHash(request);
+      } catch (error) {
+        // No valid credential is present to revoke. Still enforce the boundary
+        // above, and remove any malformed/absent browser cookie idempotently.
+        if (error instanceof PlanningError && error.code === "SESSION_REQUIRED")
+          return sessionCookie("", 0);
+        throw error;
+      }
+      const key = config.prefix + "session:" + hash;
       try {
         const deleted = await command(["DEL", key]);
         if (deleted !== 0 && deleted !== 1) return unavailable();
