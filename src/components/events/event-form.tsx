@@ -6,11 +6,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  CircleCheck,
   Heart,
   CakeSlice,
   Users,
-  Pencil,
 } from "lucide-react";
 import { Field } from "@/components/ui/field";
 import {
@@ -19,11 +17,10 @@ import {
   EVENT_TYPES,
   EVENT_TYPE_LABELS,
 } from "@/lib/schemas/event";
-import { formatEventDate, todayInIndia } from "@/lib/domain/date";
-import { formatINR } from "@/lib/domain/money";
+import { todayInIndia } from "@/lib/domain/date";
 import type { EventDetails, EventFormValues } from "@/types";
 import type { EventPlan } from "@/lib/schemas/plan";
-import { GenerationPanel } from "@/components/planner/generation-panel";
+import { EventReview } from "@/components/events/event-review";
 import { PlanDashboard } from "@/components/planner/plan-dashboard";
 
 const subscribeToHydration = () => () => {};
@@ -114,72 +111,12 @@ export function EventForm({ initialToday }: { initialToday: string }) {
       <div className="form-layout">
         <div className="form-main">
           {reviewed ? (
-            <section className="review-section" aria-labelledby="review-title">
-              <CircleCheck
-                aria-hidden="true"
-                className="review-check"
-                size={36}
-                strokeWidth={1.5}
-              />
-              <h1 id="review-title" ref={reviewHeading} tabIndex={-1}>
-                A lovely place to start.
-              </h1>
-              <p className="intro">
-                Review your event details. You can go back and make them yours.
-              </p>
-              <h2 className="review-name">{reviewed.name}</h2>
-              <dl className="review-details">
-                <div>
-                  <dt>Celebration</dt>
-                  <dd>{EVENT_TYPE_LABELS[reviewed.eventType]}</dd>
-                </div>
-                <div>
-                  <dt>Date</dt>
-                  <dd>{formatEventDate(reviewed.date)}</dd>
-                </div>
-                <div>
-                  <dt>Location</dt>
-                  <dd>{reviewed.location}</dd>
-                </div>
-                <div>
-                  <dt>Guests</dt>
-                  <dd>{reviewed.guests.toLocaleString("en-IN")}</dd>
-                </div>
-                <div>
-                  <dt>Total budget</dt>
-                  <dd>{formatINR(reviewed.budgetPaise)}</dd>
-                </div>
-                <div>
-                  <dt>Theme</dt>
-                  <dd>{reviewed.theme || "Open to ideas"}</dd>
-                </div>
-                <div className="wide">
-                  <dt>Personal preferences</dt>
-                  <dd>{reviewed.preferences || "None added"}</dd>
-                </div>
-                <div className="wide">
-                  <dt>Special requirements</dt>
-                  <dd>{reviewed.specialRequirements || "None added"}</dd>
-                </div>
-              </dl>
-              <p className="scope-note" role="status">
-                Your brief has been checked. It isn’t saved or sent anywhere
-                until you choose Generate plan. Review the sharing notice below
-                before generating. Save the finished plan to keep it in this
-                browser.
-              </p>
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={editBrief}
-              >
-                <Pencil aria-hidden="true" size={17} /> Edit event details
-              </button>
-              <GenerationPanel
-                details={reviewed}
-                onGenerated={setGeneratedPlan}
-              />
-            </section>
+            <EventReview
+              details={reviewed}
+              onEdit={editBrief}
+              onGenerated={setGeneratedPlan}
+              headingRef={reviewHeading}
+            />
           ) : (
             <>
               <h1 ref={formHeading} tabIndex={-1}>
