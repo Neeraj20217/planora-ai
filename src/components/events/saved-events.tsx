@@ -42,7 +42,7 @@ export function SavedEvents() {
                 : 0;
 
             return (
-              <li key={plan.id} className="saved-event-card">
+              <li key={plan.id} className={`saved-event-card saved-${plan.details.eventType}`}>
                 <div className="saved-event-body">
                   <div className="saved-event-top">
                     <span
@@ -88,12 +88,8 @@ export function SavedEvents() {
                         {completedTasks} / {totalTasks} tasks ({progressPercent}%)
                       </span>
                     </div>
-                    <div className="progress-track" aria-hidden="true">
-                      <div
-                        className="progress-fill"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
+                    <progress className="saved-progress" value={completedTasks} max={totalTasks || 1}
+                      aria-label={`Preparation for ${plan.details.name}: ${completedTasks} of ${totalTasks} tasks complete`} />
                   </div>
                 </div>
 

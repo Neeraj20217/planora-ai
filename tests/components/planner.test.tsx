@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GenerationPanel } from "@/components/planner/generation-panel";
 import { PlanDashboard } from "@/components/planner/plan-dashboard";
 import { brief, fixturePlan } from "../fixtures/planning";
+import { formatINR } from "@/lib/domain/money";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 beforeEach(() => localStorage.clear());
@@ -58,6 +59,29 @@ describe("generation states", () => {
   });
 });
 describe("interactive planning dashboard", () => {
+  it("presents exact allocations and reserve percentages without implying actual spending", () => {
+    const plan = fixturePlan();
+    const original = JSON.stringify(plan);
+    const { container } = render(<PlanDashboard initialPlan={plan} />);
+    expect(screen.getByText(/Actual spending is not tracked/)).toBeVisible();
+    const rows = container.querySelectorAll(".budget-line");
+    plan.categories.forEach((category, index) => {
+      const row = within(rows[index] as HTMLElement);
+      expect(row.getByText(formatINR(category.allocationPaise))).toBeVisible();
+      expect(row.getByText(`${(category.allocationPaise / plan.details.budgetPaise * 100).toFixed(2)}%`)).toBeVisible();
+    });
+    expect(screen.getByText("10% contingency target · rounded down")).toBeVisible();
+    expect(JSON.stringify(plan)).toBe(original);
+  });
+
+  it("renders zero-budget allocation bars safely and keeps task progress accessible", () => {
+    const { container } = render(<PlanDashboard initialPlan={fixturePlan({ budgetPaise: 0 })} />);
+    expect(container.textContent).not.toMatch(/NaN|Infinity/);
+    for (const bar of container.querySelectorAll<HTMLElement>(".allocation-track > span"))
+      expect(bar.style.width).toBe("0%");
+    expect(screen.getByRole("progressbar", { name: "Overall task completion" })).toHaveAttribute("value", "0");
+  });
+
   it("tracks task completion and vendor status and saves them", async () => {
     const user = userEvent.setup();
     render(<PlanDashboard initialPlan={fixturePlan()} />);

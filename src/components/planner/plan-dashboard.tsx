@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Check } from "lucide-react";
+import { ArrowLeft, Save, Check, Users, CalendarDays, IndianRupee, CheckCircle2, Sparkles } from "lucide-react";
 import {
   CATEGORY_LABELS,
   type EventPlan,
@@ -80,6 +80,7 @@ export function PlanDashboard({
   const context = planningContext(plan.details, plan.asOfDate);
   const completed = plan.tasks.filter((task) => task.completed).length;
   const percent = Math.round((completed / plan.tasks.length) * 100);
+  const daysUntilEvent = planningContext(plan.details, todayInIndia()).daysRemaining;
   const conflict =
     savedRevision !== undefined && savedRevision !== plan.revision;
   const tasks = [...plan.tasks].sort((a, b) =>
@@ -138,6 +139,7 @@ export function PlanDashboard({
       ) : null}
       <div className="dashboard-heading">
         <div>
+          <p className="atelier-eyebrow"><Sparkles size={14} aria-hidden="true" /> Your celebration, taking shape</p>
           <h1 ref={title} tabIndex={-1}>
             {plan.details.name}
           </h1>
@@ -151,6 +153,12 @@ export function PlanDashboard({
           {plan.revision > 0 ? "Save changes" : "Save plan"}
         </button>
       </div>
+      <dl className="dashboard-metrics">
+        <div><dt><IndianRupee size={17} aria-hidden="true" /> Planned budget</dt><dd>{formatINR(plan.details.budgetPaise)}<span>Allocations, not actual spending</span></dd></div>
+        <div><dt><Users size={17} aria-hidden="true" /> Gathering together</dt><dd>{plan.details.guests.toLocaleString("en-IN")} <small>guests</small><span>{plan.details.location}</span></dd></div>
+        <div><dt><CalendarDays size={17} aria-hidden="true" /> {daysUntilEvent < 0 ? "Days since event" : "Days remaining"}</dt><dd>{Math.abs(daysUntilEvent)} <small>days</small><span>{formatEventDate(plan.details.date)}</span></dd></div>
+        <div><dt><CheckCircle2 size={17} aria-hidden="true" /> Preparation progress</dt><dd>{percent}<small>% complete</small><span>{completed} of {plan.tasks.length} tasks complete</span><progress value={completed} max={plan.tasks.length} aria-label="Overall task completion" /></dd></div>
+      </dl>
       <p className="scope-note">
         {plan.provenance === "test-fixture"
           ? "Test fixture — not live AI."
@@ -187,7 +195,9 @@ export function PlanDashboard({
         <a href="#vendors">Vendors</a>
         <a href="#ideas">Ideas</a>
       </nav>
+      <div className="dashboard-grid">
       <section id="overview" className="plan-section">
+        <p className="section-kicker">01 / The big picture</p>
         <h2>Your celebration, thoughtfully planned</h2>
         <p>{plan.overview}</p>
         <dl className="event-facts">
@@ -244,7 +254,9 @@ export function PlanDashboard({
         </details>
       </section>
       <section id="budget" className="plan-section">
+        <p className="section-kicker">02 / Every rupee, considered</p>
         <h2>A budget with breathing room</h2>
+        <p className="allocation-notice">Planned allocation · Actual spending is not tracked</p>
         <p>
           Estimated allocations, not vendor quotes. Includes a 10% contingency
           reserve, rounded down to a paise. About{" "}
@@ -253,15 +265,17 @@ export function PlanDashboard({
         <div className="budget-lines" role="list">
           {plan.categories.map((category) => (
             <div
-              className="budget-line"
+              className={`budget-line${category.category === "contingency" ? " budget-reserve" : ""}`}
               role="listitem"
               key={category.category}
             >
               <div>
                 <h3>{CATEGORY_LABELS[category.category]}</h3>
+                {category.category === "contingency" ? <span className="reserve-label">10% contingency target · rounded down</span> : null}
                 <p>{category.rationale}</p>
               </div>
-              <strong>{formatINR(category.allocationPaise)}</strong>
+              <div className="allocation-value"><strong>{formatINR(category.allocationPaise)}</strong><span>{(plan.details.budgetPaise === 0 ? 0 : category.allocationPaise / plan.details.budgetPaise * 100).toFixed(2)}%</span></div>
+              <div className="allocation-track" aria-hidden="true"><span style={{ width: `${plan.details.budgetPaise === 0 ? 0 : category.allocationPaise / plan.details.budgetPaise * 100}%` }} /></div>
             </div>
           ))}
         </div>
@@ -278,6 +292,7 @@ export function PlanDashboard({
         </p>
       </section>
       <section id="timeline" className="plan-section">
+        <p className="section-kicker">03 / One step at a time</p>
         <h2>Your preparation timeline</h2>
         <p>
           {completed} of {plan.tasks.length} tasks complete · {percent}%
@@ -293,7 +308,7 @@ export function PlanDashboard({
         </p>
         <ol className="task-list">
           {tasks.map((task) => (
-            <li key={task.id}>
+            <li key={task.id} data-completed={task.completed}>
               <label className="task-control">
                 <input
                   type="checkbox"
@@ -316,8 +331,8 @@ export function PlanDashboard({
                     {task.title}
                   </span>
                   <span className="task-date">
-                    {formatEventDate(task.dueDate)}
-                    {task.priority === "high" ? " · Priority" : ""}
+                    <time dateTime={task.dueDate}>{formatEventDate(task.dueDate)}</time>
+                    <span className={`task-priority priority-${task.priority}`}>{task.priority === "high" ? "High priority" : "Standard"}</span>
                     {!task.completed && task.dueDate < todayInIndia()
                       ? " · Overdue"
                       : ""}
@@ -340,6 +355,7 @@ export function PlanDashboard({
         </ol>
       </section>
       <section id="vendors" className="plan-section">
+        <p className="section-kicker">04 / Your supporting cast</p>
         <h2>People & services to arrange</h2>
         <p>
           Essential refers to the arrangement, not a requirement to hire.
@@ -348,17 +364,18 @@ export function PlanDashboard({
         </p>
         <div className="vendor-list">
           {plan.vendors.map((vendor) => (
-            <div className="vendor-row" key={vendor.category}>
+            <div className="vendor-row" key={vendor.category} data-status={vendor.status}>
               <div>
                 <h3>
                   {CATEGORY_LABELS[vendor.category]}{" "}
-                  <span className="vendor-kind">
+                  <span className={`vendor-kind ${vendor.essential ? "vendor-essential" : "vendor-optional"}`}>
                     {vendor.essential ? "Essential" : "Optional"}
                   </span>
                 </h3>
                 <p>{vendor.rationale}</p>
               </div>
               <div>
+                <span className={`vendor-status status-${vendor.status}`}>{vendor.status === "booked" ? "Booked / arranged" : vendor.status === "not-started" ? "Not started" : vendor.status === "not-needed" ? "Not needed" : vendor.status === "shortlisted" ? "Shortlisted" : "Contacted"}</span>
                 <label htmlFor={`vendor-${vendor.category}`}>
                   Selection status for {CATEGORY_LABELS[vendor.category]}
                 </label>
@@ -395,6 +412,7 @@ export function PlanDashboard({
         <h2>Thoughtful ways to spend less</h2>
         <AdviceList items={plan.savings} />
       </section>
+      </div>
       <p className="scope-note">
         Plans are stored on this device and site address only. Browser clearing,
         private browsing or switching devices can remove access. Save after
