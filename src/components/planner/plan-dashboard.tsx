@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Check, Users, CalendarDays, IndianRupee, CheckCircle2, Sparkles } from "lucide-react";
-import {
-  CATEGORY_LABELS,
-  type EventPlan,
-  type PlanVendor,
+import type {
+  EventPlan,
+  PlanVendor,
 } from "@/lib/schemas/plan";
+import { BudgetSection } from "./budget-section";
+import { VendorSection } from "./vendor-section";
 import { EVENT_TYPE_LABELS } from "@/lib/schemas/event";
 import { formatINR } from "@/lib/domain/money";
 import { formatEventDate, todayInIndia } from "@/lib/domain/date";
@@ -196,222 +197,147 @@ export function PlanDashboard({
         <a href="#ideas">Ideas</a>
       </nav>
       <div className="dashboard-grid">
-      <section id="overview" className="plan-section">
-        <p className="section-kicker">01 / The big picture</p>
-        <h2>Your celebration, thoughtfully planned</h2>
-        <p>{plan.overview}</p>
-        <dl className="event-facts">
-          <div>
-            <dt>Guests</dt>
-            <dd>{plan.details.guests.toLocaleString("en-IN")}</dd>
-          </div>
-          <div>
-            <dt>Total budget</dt>
-            <dd>{formatINR(plan.details.budgetPaise)}</dd>
-          </div>
-          <div>
-            <dt>Theme</dt>
-            <dd>{plan.details.theme || "Open to ideas"}</dd>
-          </div>
-        </dl>
-        <details>
-          <summary>Your preferences & special requirements</summary>
-          <p>{plan.details.preferences || "No preferences added."}</p>
-          <p>
-            {plan.details.specialRequirements ||
-              "No special requirements added."}
-          </p>
-        </details>
-      </section>
-      <section
-        className="plan-section warning-section"
-        aria-labelledby="warnings-title"
-      >
-        <h2 id="warnings-title">Feasibility & things to confirm</h2>
-        <p>
-          AI suggestions may be incomplete or inaccurate. Verify feasibility,
-          suppliers and local requirements before committing.
-        </p>
-        {plan.warnings.length ? (
-          <ul>
-            {plan.warnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
-        ) : (
-          <p>
-            No additional conflicts were flagged. This does not guarantee
-            feasibility.
-          </p>
-        )}
-        <details>
-          <summary>Planning assumptions</summary>
-          <ul>
-            {plan.assumptions.map((item, index) => (
-              <li key={index}>{item}</li>
-            ))}
-          </ul>
-        </details>
-      </section>
-      <section id="budget" className="plan-section">
-        <p className="section-kicker">02 / Every rupee, considered</p>
-        <h2>A budget with breathing room</h2>
-        <p className="allocation-notice">Planned allocation · Actual spending is not tracked</p>
-        <p>
-          Estimated allocations, not vendor quotes. Includes a 10% contingency
-          reserve, rounded down to a paise. About{" "}
-          {formatINR(context.perGuestPaise)} per guest before contingency.
-        </p>
-        <div className="budget-lines" role="list">
-          {plan.categories.map((category) => (
-            <div
-              className={`budget-line${category.category === "contingency" ? " budget-reserve" : ""}`}
-              role="listitem"
-              key={category.category}
-            >
-              <div>
-                <h3>{CATEGORY_LABELS[category.category]}</h3>
-                {category.category === "contingency" ? <span className="reserve-label">10% contingency target · rounded down</span> : null}
-                <p>{category.rationale}</p>
-              </div>
-              <div className="allocation-value"><strong>{formatINR(category.allocationPaise)}</strong><span>{(plan.details.budgetPaise === 0 ? 0 : category.allocationPaise / plan.details.budgetPaise * 100).toFixed(2)}%</span></div>
-              <div className="allocation-track" aria-hidden="true"><span style={{ width: `${plan.details.budgetPaise === 0 ? 0 : category.allocationPaise / plan.details.budgetPaise * 100}%` }} /></div>
+        <section id="overview" className="plan-section">
+          <p className="section-kicker">01 / The big picture</p>
+          <h2>Your celebration, thoughtfully planned</h2>
+          <p>{plan.overview}</p>
+          <dl className="event-facts">
+            <div>
+              <dt>Guests</dt>
+              <dd>{plan.details.guests.toLocaleString("en-IN")}</dd>
             </div>
-          ))}
-        </div>
-        <p className="budget-total">
-          Total allocated{" "}
-          <strong>
-            {formatINR(
-              plan.categories.reduce(
-                (sum, category) => sum + category.allocationPaise,
-                0,
-              ),
-            )}
-          </strong>
-        </p>
-      </section>
-      <section id="timeline" className="plan-section">
-        <p className="section-kicker">03 / One step at a time</p>
-        <h2>Your preparation timeline</h2>
-        <p>
-          {completed} of {plan.tasks.length} tasks complete · {percent}%
-        </p>
-        <progress
-          value={completed}
-          max={plan.tasks.length}
-          aria-label="Planning progress"
+            <div>
+              <dt>Total budget</dt>
+              <dd>{formatINR(plan.details.budgetPaise)}</dd>
+            </div>
+            <div>
+              <dt>Theme</dt>
+              <dd>{plan.details.theme || "Open to ideas"}</dd>
+            </div>
+          </dl>
+          <details>
+            <summary>Your preferences & special requirements</summary>
+            <p>{plan.details.preferences || "No preferences added."}</p>
+            <p>
+              {plan.details.specialRequirements ||
+                "No special requirements added."}
+            </p>
+          </details>
+        </section>
+        <section
+          className="plan-section warning-section"
+          aria-labelledby="warnings-title"
+        >
+          <h2 id="warnings-title">Feasibility & things to confirm</h2>
+          <p>
+            AI suggestions may be incomplete or inaccurate. Verify feasibility,
+            suppliers and local requirements before committing.
+          </p>
+          {plan.warnings.length ? (
+            <ul>
+              {plan.warnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>
+              No additional conflicts were flagged. This does not guarantee
+              feasibility.
+            </p>
+          )}
+          <details>
+            <summary>Planning assumptions</summary>
+            <ul>
+              {plan.assumptions.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </details>
+        </section>
+        <BudgetSection
+          categories={plan.categories}
+          totalBudgetPaise={plan.details.budgetPaise}
+          perGuestPaise={context.perGuestPaise}
         />
-        <p className="quiet">
-          Dates are in India time. Tasks on the same day still need to follow
-          dependency order.
-        </p>
-        <ol className="task-list">
-          {tasks.map((task) => (
-            <li key={task.id} data-completed={task.completed}>
-              <label className="task-control">
-                <input
-                  type="checkbox"
-                  checked={task.completed}
-                  onChange={() => {
-                    setPlan((current) => ({
-                      ...current,
-                      tasks: current.tasks.map((item) =>
-                        item.id === task.id
-                          ? { ...item, completed: !item.completed }
-                          : item,
-                      ),
-                    }));
-                    setDirty(true);
-                    setMessage("");
-                  }}
-                />
-                <span>
-                  <span className={task.completed ? "completed-task" : ""}>
-                    {task.title}
-                  </span>
-                  <span className="task-date">
-                    <time dateTime={task.dueDate}>{formatEventDate(task.dueDate)}</time>
-                    <span className={`task-priority priority-${task.priority}`}>{task.priority === "high" ? "High priority" : "Standard"}</span>
-                    {!task.completed && task.dueDate < todayInIndia()
-                      ? " · Overdue"
-                      : ""}
-                  </span>
-                  {task.dependsOn.length ? (
-                    <span className="task-deps">
-                      After:{" "}
-                      {task.dependsOn
-                        .map(
-                          (id) =>
-                            plan.tasks.find((item) => item.id === id)!.title,
-                        )
-                        .join("; ")}
+        <section id="timeline" className="plan-section">
+          <p className="section-kicker">03 / One step at a time</p>
+          <h2>Your preparation timeline</h2>
+          <p>
+            {completed} of {plan.tasks.length} tasks complete · {percent}%
+          </p>
+          <progress
+            value={completed}
+            max={plan.tasks.length}
+            aria-label="Planning progress"
+          />
+          <p className="quiet">
+            Dates are in India time. Tasks on the same day still need to follow
+            dependency order.
+          </p>
+          <ol className="task-list">
+            {tasks.map((task) => (
+              <li key={task.id} data-completed={task.completed}>
+                <label className="task-control">
+                  <input
+                    type="checkbox"
+                    checked={task.completed}
+                    onChange={() => {
+                      setPlan((current) => ({
+                        ...current,
+                        tasks: current.tasks.map((item) =>
+                          item.id === task.id
+                            ? { ...item, completed: !item.completed }
+                            : item,
+                        ),
+                      }));
+                      setDirty(true);
+                      setMessage("");
+                    }}
+                  />
+                  <span>
+                    <span className={task.completed ? "completed-task" : ""}>
+                      {task.title}
                     </span>
-                  ) : null}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ol>
-      </section>
-      <section id="vendors" className="plan-section">
-        <p className="section-kicker">04 / Your supporting cast</p>
-        <h2>People & services to arrange</h2>
-        <p>
-          Essential refers to the arrangement, not a requirement to hire.
-          Self-provided space, DIY and volunteer help may be suitable. No
-          businesses, prices or availability have been verified.
-        </p>
-        <div className="vendor-list">
-          {plan.vendors.map((vendor) => (
-            <div className="vendor-row" key={vendor.category} data-status={vendor.status}>
-              <div>
-                <h3>
-                  {CATEGORY_LABELS[vendor.category]}{" "}
-                  <span className={`vendor-kind ${vendor.essential ? "vendor-essential" : "vendor-optional"}`}>
-                    {vendor.essential ? "Essential" : "Optional"}
+                    <span className="task-date">
+                      <time dateTime={task.dueDate}>{formatEventDate(task.dueDate)}</time>
+                      <span className={`task-priority priority-${task.priority}`}>{task.priority === "high" ? "High priority" : "Standard"}</span>
+                      {!task.completed && task.dueDate < todayInIndia()
+                        ? " · Overdue"
+                        : ""}
+                    </span>
+                    {task.dependsOn.length ? (
+                      <span className="task-deps">
+                        After:{" "}
+                        {task.dependsOn
+                          .map(
+                            (id) =>
+                              plan.tasks.find((item) => item.id === id)!.title,
+                          )
+                          .join("; ")}
+                      </span>
+                    ) : null}
                   </span>
-                </h3>
-                <p>{vendor.rationale}</p>
-              </div>
-              <div>
-                <span className={`vendor-status status-${vendor.status}`}>{vendor.status === "booked" ? "Booked / arranged" : vendor.status === "not-started" ? "Not started" : vendor.status === "not-needed" ? "Not needed" : vendor.status === "shortlisted" ? "Shortlisted" : "Contacted"}</span>
-                <label htmlFor={`vendor-${vendor.category}`}>
-                  Selection status for {CATEGORY_LABELS[vendor.category]}
                 </label>
-                <select
-                  id={`vendor-${vendor.category}`}
-                  value={vendor.status}
-                  onChange={(event) =>
-                    updateVendor(
-                      vendor.category,
-                      event.target.value as PlanVendor["status"],
-                    )
-                  }
-                >
-                  <option value="not-started">Not started</option>
-                  <option value="shortlisted">Shortlisted</option>
-                  <option value="contacted">Contacted</option>
-                  <option value="booked">Booked / arranged</option>
-                  <option value="not-needed">Not needed</option>
-                </select>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="plan-section">
-        <h2>Focus your energy here</h2>
-        <AdviceList items={plan.recommendations} />
-      </section>
-      <section id="ideas" className="plan-section">
-        <h2>Make the moment yours</h2>
-        <AdviceList items={plan.ideas} />
-      </section>
-      <section className="plan-section">
-        <h2>Thoughtful ways to spend less</h2>
-        <AdviceList items={plan.savings} />
-      </section>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <VendorSection
+          vendors={plan.vendors}
+          onUpdateVendor={updateVendor}
+        />
+        <section className="plan-section">
+          <h2>Focus your energy here</h2>
+          <AdviceList items={plan.recommendations} />
+        </section>
+        <section id="ideas" className="plan-section">
+          <h2>Make the moment yours</h2>
+          <AdviceList items={plan.ideas} />
+        </section>
+        <section className="plan-section">
+          <h2>Thoughtful ways to spend less</h2>
+          <AdviceList items={plan.savings} />
+        </section>
       </div>
       <p className="scope-note">
         Plans are stored on this device and site address only. Browser clearing,
