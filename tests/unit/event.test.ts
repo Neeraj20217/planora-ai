@@ -8,6 +8,7 @@ import {
 } from "@/lib/schemas/event";
 import { isCalendarDate, todayInIndia } from "@/lib/domain/date";
 import { rupeesToPaise } from "@/lib/domain/money";
+import { getSamplePlan } from "@/lib/domain/sample-plans";
 
 const schema = createEventFormSchema("2026-10-26");
 const valid = {
@@ -118,6 +119,23 @@ describe("calendar dates", () => {
   it("uses the Indian calendar date around UTC midnight boundaries", () => {
     expect(todayInIndia(new Date("2026-10-25T18:29:59Z"))).toBe("2026-10-25");
     expect(todayInIndia(new Date("2026-10-25T18:30:00Z"))).toBe("2026-10-26");
+  });
+  it("computes offline sample plan event dates in IST around midnight IST", () => {
+    // 23:59:59 IST on 2026-10-25 (18:29:59 UTC) -> today is 2026-10-25; +45 days in IST is 2026-12-09
+    const beforeMidnight = new Date("2026-10-25T18:29:59Z");
+    const planBefore = getSamplePlan("wedding", undefined, beforeMidnight);
+    expect(planBefore.details.date).toBe("2026-12-09");
+
+    // 00:00:00 IST on 2026-10-26 (18:30:00 UTC) -> today is 2026-10-26; +45 days in IST is 2026-12-10
+    // UTC extraction would produce 2026-12-09 (off by 1 day)
+    const atMidnight = new Date("2026-10-25T18:30:00Z");
+    const planAt = getSamplePlan("wedding", undefined, atMidnight);
+    expect(planAt.details.date).toBe("2026-12-10");
+
+    // 01:00:00 IST on 2026-10-26 (19:30:00 UTC) -> today is 2026-10-26; +45 days in IST is 2026-12-10
+    const afterMidnight = new Date("2026-10-25T19:30:00Z");
+    const planAfter = getSamplePlan("birthday", undefined, afterMidnight);
+    expect(planAfter.details.date).toBe("2026-12-10");
   });
 });
 

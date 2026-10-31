@@ -1,6 +1,7 @@
 import { composePlan } from "./plan";
 import { proposalSchema, type EventPlan, type Proposal } from "@/lib/schemas/plan";
 import type { EventDetails, EventType } from "@/types";
+import { todayInIndia } from "./date";
 
 const SAMPLE_PROPOSALS: Record<EventType, Proposal> = {
   birthday: proposalSchema.parse({
@@ -131,11 +132,11 @@ const SAMPLE_PROPOSALS: Record<EventType, Proposal> = {
 export function getSamplePlan(
   eventType: EventType,
   overrides?: Partial<EventDetails>,
+  now = new Date(),
 ): EventPlan {
   const proposal = SAMPLE_PROPOSALS[eventType] ?? SAMPLE_PROPOSALS.birthday;
-  const now = new Date();
   const futureDate = new Date(now.getTime() + 45 * 86400 * 1000);
-  const dateStr = futureDate.toISOString().slice(0, 10);
+  const dateStr = todayInIndia(futureDate);
 
   const defaultDetails: EventDetails = {
     eventType,

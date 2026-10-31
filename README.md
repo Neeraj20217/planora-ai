@@ -96,7 +96,7 @@ npm run build
 npm run test:e2e
 ```
 
-Pre-submission audit on **October 31, 2026**: **240 automated tests in 14 files passed**, including logout, access, retry and offline-reference regressions. **12 focused desktop/mobile browser checks passed** for access, safe errors, direct offline samples, mocked generation, task/vendor editing and save/refresh/reopen. TypeScript, ESLint and the production build passed. Automated providers are mocked; no live Gemini request is needed. Browser tests use synthetic data and mocked responses where applicable. Historical live generation and isolated Redis results are documented separately and are not rerun or represented as new live results here.
+Pre-submission audit on **October 31, 2026**: **272 automated tests in 15 files passed**, including logout, access, retry and offline-reference regressions. **34 desktop/mobile Playwright tests passed** for access, safe errors, direct offline samples, mocked generation, task/vendor editing and save/refresh/reopen. TypeScript, ESLint and the production build passed. Automated providers are mocked; no live Gemini request is needed. Browser tests use synthetic data and mocked responses where applicable. Historical live generation and isolated Redis results are documented separately and are not rerun or represented as new live results here.
 
 ## Repository layout
 

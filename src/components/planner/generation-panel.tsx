@@ -30,10 +30,12 @@ export function GenerationPanel({
       return;
     }
     controller.current = new AbortController();
-    const signal = AbortSignal.any([
-      controller.current.signal,
-      AbortSignal.timeout(50_000),
-    ]);
+    const requestSignal = (timeoutMs: number) =>
+      AbortSignal.any([
+        controller.current!.signal,
+        AbortSignal.timeout(timeoutMs),
+      ]);
+    let activeSignal = requestSignal(50_000);
     setPending(true);
     setError("");
     try {
@@ -42,7 +44,7 @@ export function GenerationPanel({
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brief: details }),
-        signal,
+        signal: activeSignal,
       });
       const applyCooldown = (res: Response) => {
         const delay = retryAfterMs(res);
@@ -52,23 +54,25 @@ export function GenerationPanel({
       let payload = await readApiResponse(response, planResponseSchema);
       if (!payload.ok) {
         if (response.status === 401 && payload.error.code === "SESSION_REQUIRED") {
+          activeSignal = requestSignal(10_000);
           const trialRes = await fetchApi("/api/access/trial", {
             method: "POST",
             credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
             body: "{}",
-            signal,
+            signal: activeSignal,
           });
           applyCooldown(trialRes);
           const trial = await readApiResponse(trialRes, accessResponseSchema);
           if (trial.ok) {
+            activeSignal = requestSignal(50_000);
             response = await fetchApi("/api/plans/generate", {
-                method: "POST",
-                credentials: "same-origin",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ brief: details }),
-                signal,
-              });
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ brief: details }),
+              signal: activeSignal,
+            });
             applyCooldown(response);
             payload = await readApiResponse(response, planResponseSchema);
           } else {
@@ -118,7 +122,7 @@ export function GenerationPanel({
     } catch (issue) {
       if (controller.current?.signal.aborted) return;
       setError(
-        signal.aborted
+        activeSignal.aborted
           ? "Generation timed out. Your brief is unchanged; please retry."
           : issue instanceof ApiResponseError && issue.kind === "network"
             ? "Could not reach the planning service. Check your connection and try again. Your brief is unchanged."

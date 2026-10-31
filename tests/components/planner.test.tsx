@@ -99,6 +99,57 @@ describe("generation states", () => {
     expect(screen.getByRole("button", { name: "Planning your celebration…" })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledOnce();
   });
+  it("allocates a fresh independent timeout signal for recovered generation after trial access", async () => {
+    const plan = fixturePlan();
+    const capturedSignals: AbortSignal[] = [];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      if (init?.signal) capturedSignals.push(init.signal);
+      if (String(url).endsWith("/api/plans/generate") && capturedSignals.length === 1) {
+        return Response.json({ error: { code: "SESSION_REQUIRED" } }, { status: 401 });
+      }
+      if (String(url).endsWith("/api/access/trial")) {
+        return Response.json({ ok: true }, { status: 200 });
+      }
+      if (String(url).endsWith("/api/plans/generate") && capturedSignals.length === 3) {
+        return Response.json({ plan }, { status: 200 });
+      }
+      return Response.json({ error: { code: "UNKNOWN" } }, { status: 500 });
+    });
+
+    const onGenerated = vi.fn();
+    render(<GenerationPanel details={brief} onGenerated={onGenerated} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+
+    await waitFor(() => expect(onGenerated).toHaveBeenCalledWith(plan));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(capturedSignals).toHaveLength(3);
+    // Distinct signal instances for initial generation, trial activation, and recovered generation
+    expect(capturedSignals[0]).not.toBe(capturedSignals[2]);
+    expect(capturedSignals[1]).not.toBe(capturedSignals[2]);
+  });
+  it("aborts in-flight request cleanly when unmounted and classifies timeout errors", async () => {
+    let capturedSignal: AbortSignal | null | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      capturedSignal = init?.signal;
+      return new Promise(() => {});
+    });
+    const { unmount } = render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal?.aborted).toBe(false);
+    unmount();
+    expect(capturedSignal?.aborted).toBe(true);
+
+    // Verify a timed-out request signal without unmount is classified as timeout
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      const signal = init?.signal as AbortSignal;
+      Object.defineProperty(signal, "aborted", { value: true, configurable: true });
+      throw new DOMException("The operation was aborted", "TimeoutError");
+    });
+    render(<GenerationPanel details={brief} onGenerated={vi.fn()} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Generate plan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Generation timed out");
+  });
 });
 describe("interactive planning dashboard", () => {
   it("presents exact allocations and reserve percentages without implying actual spending", () => {

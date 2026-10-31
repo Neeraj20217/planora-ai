@@ -382,6 +382,21 @@ describe("invite redemption and session lifecycle", () => {
     ).toBe(429);
     expect(h.provider).not.toHaveBeenCalled();
   });
+  it("rejects empty, whitespace, and missing invite codes before security evaluation", async () => {
+    const h = await harness();
+    const redeem = accessHandler(() => h.security, "redeem");
+    for (const invalid of [{ code: "" }, { code: "   " }, { code: "\t\n" }, {}]) {
+      const res = await redeem(request({}, invalid));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: { code: "INVALID_INPUT", message: "Check the access form." },
+      });
+    }
+    // Valid code with surrounding whitespace is trimmed and succeeds
+    const validRes = await redeem(request({}, { code: `  ${code}  ` }));
+    expect(validRes.status).toBe(200);
+    expect(validRes.headers.get("set-cookie")).toContain("HttpOnly");
+  });
 });
 
 describe("configuration and REST transport fail closed", () => {

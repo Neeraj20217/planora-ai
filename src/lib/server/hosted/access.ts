@@ -3,6 +3,14 @@ import { readBody } from "../handler";
 import { PlanningError } from "../errors";
 import type { HostedSecurity } from "./security";
 
+const redeemSchema = z
+  .object({
+    code: z.string().trim().min(1).max(256),
+  })
+  .strict();
+
+const emptyPayloadSchema = z.record(z.string(), z.unknown());
+
 export function accessHandler(
   getSecurity: () => HostedSecurity,
   action: "redeem" | "logout" | "trial",
@@ -25,22 +33,23 @@ export function accessHandler(
           "CONTENT_TYPE",
           "Send JSON access details.",
         );
-      const schema =
-        action === "redeem"
-          ? z.object({ code: z.string().max(256) }).strict()
-          : z.record(z.string(), z.unknown());
-      const parsed = schema.safeParse(await readBody(request));
-      if (!parsed.success)
-        throw new PlanningError(400, "INVALID_INPUT", "Check the access form.");
-      headers["Set-Cookie"] =
-        action === "redeem"
-          ? await security.redeem(
-              request,
-              (parsed.data as { code: string }).code,
-            )
-          : action === "trial"
+      if (action === "redeem") {
+        const parsed = redeemSchema.safeParse(await readBody(request));
+        if (!parsed.success)
+          throw new PlanningError(400, "INVALID_INPUT", "Check the access form.");
+        headers["Set-Cookie"] = await security.redeem(
+          request,
+          parsed.data.code,
+        );
+      } else {
+        const parsed = emptyPayloadSchema.safeParse(await readBody(request));
+        if (!parsed.success)
+          throw new PlanningError(400, "INVALID_INPUT", "Check the access form.");
+        headers["Set-Cookie"] =
+          action === "trial"
             ? await security.trial(request)
             : await security.logout(request);
+      }
       return Response.json({ ok: true }, { headers });
     } catch (error) {
       const safe =
